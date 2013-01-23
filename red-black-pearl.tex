@@ -1,0 +1,18 @@
+
+The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
+
+Removal of [Okasaki] nodes from trees can be accomplished by marking a node as deleted and deferring the actual removal to a batch removal performed when deleted nodes begin to outnumber the others. This operation gives even lower than amortized logarithmic time complexity and doesn't interfere with the complexity of other tree operations.
+
+What is the argument for a removal operation with immediate complexity of O(log n)?
+Okasaki's thesis, page 50 (as numbered), par. 3: this mentions the cost of marking the node as deleted, but doesn't factor it into the amortized cost, correct? If we have n nodes and "delete" n/2, that takes (n log n)/2 operations. The rebuild takes n operations. So the amortized complexity is [(n log n)/2 + n]/(n/2)=log n + 1/2, or log n. So, the complexity is the same, but there is a constant factor. What happens if we add and remove the element multiple times. The addition has an immediate complexity and so is taken care of. The deletion has an amortized complexity, but say each deleted node was added and deleted k times. Then more deletes are happening over which the n/2 cost is spread, so it's actually better.
+
+A red-black tree must satisfy two invariants:
+
+\begin{enumerate}
+\item No red node has a red parent.
+\item Every path from the root to an empty node contains the same number of black nodes.
+\end{enumerate}
+
+The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
+
+There are x operations generally defined for red-black trees.
