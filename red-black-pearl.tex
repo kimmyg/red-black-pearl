@@ -6,6 +6,8 @@ Removal of [Okasaki] nodes from trees can be accomplished by marking a node as d
 What is the argument for a removal operation with immediate complexity of O(log n)?
 Okasaki's thesis, page 50 (as numbered), par. 3: this mentions the cost of marking the node as deleted, but doesn't factor it into the amortized cost, correct? If we have n nodes and "delete" n/2, that takes (n log n)/2 operations. The rebuild takes n operations. So the amortized complexity is [(n log n)/2 + n]/(n/2)=log n + 1/2, or log n. So, the complexity is the same, but there is a constant factor. What happens if we add and remove the element multiple times. The addition has an immediate complexity and so is taken care of. The deletion has an amortized complexity, but say each deleted node was added and deleted k times. Then more deletes are happening over which the n/2 cost is spread, so it's actually better.
 
+An immediate delete localizes the (conceptual /and/ time) complexity of the data structure. (Conceptually, because a counter needs to be kept in the other case, unless you want to incur an O(n) operation every time you want to delete.)
+
 A red-black tree must satisfy two invariants:
 
 \begin{enumerate}
