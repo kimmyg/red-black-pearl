@@ -1,3 +1,49 @@
+\documentclass[preprint]{sigplanconf}
+
+% The following \documentclass options may be useful:
+%
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+\usepackage{amsmath}
+
+\begin{document}
+
+\conferenceinfo{ICFP '13}{date, Boston} 
+\copyrightyear{2013} 
+\copyrightdata{[to be supplied]} 
+
+\titlebanner{Red-Black Tree Deletion}        % These are ignored unless
+\preprintfooter{Presents the missing method of Okasaki's red-black trees.}   % 'preprint' option specified.
+
+\title{The Curse of the Red-Black Tree}
+\subtitle{Functional Pearl}
+
+\authorinfo{Kimball Germane\and Matt Might}
+           {University of Utah}
+           %{Email2/3}
+
+\maketitle
+
+\begin{abstract}
+This is the text of the abstract.
+\end{abstract}
+
+\category{CR-number}{subcategory}{third-level}
+
+\terms
+term1, term2
+
+\keywords
+keyword1, keyword2
+
+\section{Introduction}
+
+When looking for a data structure to back functional implementation of sets, balanced trees--and particularly red-black trees--are a natural choice. Common set operations, such as membership testing and persistent addition map naturally to the native operations of the backing store. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, balanced trees are efficient, persistent, and still leave us wanting.
+
+
+
 
 The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
 
@@ -18,3 +64,85 @@ A red-black tree must satisfy two invariants:
 The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
 
 There are x operations generally defined for red-black trees.
+
+Red-black trees are typically used as the backing store for finite subsets of 
+a totally-ordered set or finite maps with a totally-ordered domain.
+
+Emphasize that we would like to localize the complexity.
+
+If we mark nodes as deleted, every operation must know about deleted nodes.
+In order to add the delete operation [in this way], we must modify every 
+other operation.
+
+THIS IS BIG: real research is going to come from a question in the form of
+"prove or disprove". Being told something is true (or good) and asked to 
+justify it is going to lead to disintegrity.
+
+First, the implementation of a simple binary tree.
+
+data Tree a = Empty | Node a (Tree a) (Tree a)
+
+insert :: (Ord a) => Tree a -> a -> Tree a
+insert Empty x = Node x Empty Empty
+insert (Node y l r) x = | x < y     -> Node y (insert l x) r
+                        | otherwise -> Node y l (insert r x)
+
+count :: Tree a -> Int
+count Empty = 0
+count (Node \_ l r) = 1 + (count l) + (count r)
+
+member :: (Ord a) => Tree a -> a -> Boolean
+member Empty \_ = False
+member (Node y l r) x = x < y     -> member l x
+                        x > y     -> member r x
+                        otherwise -> True
+
+Deletion in a binary tree is fairly straightforward.
+
+delete :: (Ord a) => Tree a -> a -> Tree a
+delete Empty \_ = Empty
+delete (Node x l Empty) x = l
+delete (Node x Empty r) x = r
+delete (Node x l (Node
+delete (Node y l r) x = x < y     -> Node y (delete l x) r
+                        x > y     -> Node y l (delete r x)
+                        otherwise ->
+
+data Color = Red | Black
+data Tree a = Empty | Node Color a (Tree a) (Tree a)
+
+enforcing invariants with types leads to Byz
+
+
+\appendix
+\section{Appendix Title}
+
+This is the text of the appendix, if you need one.
+
+\acks
+
+Acknowledgments, if needed.
+
+% We recommend abbrvnat bibliography style.
+
+\bibliographystyle{abbrvnat}
+\bibliography{red-black-pearl}
+
+% The bibliography should be embedded for final submission.
+
+\begin{thebibliography}{}
+\softraggedright
+
+\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+P. Q. Smith, and X. Y. Jones. ...reference text...
+
+\end{thebibliography}
+
+\end{document}
+
+
+
+
+
+
+
