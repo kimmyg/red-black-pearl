@@ -40,9 +40,16 @@ keyword1, keyword2
 
 \section{Introduction}
 
-When looking for a data structure to back functional implementation of sets, balanced trees--and particularly red-black trees--are a natural choice. Common set operations, such as membership testing and persistent addition map naturally to the native operations of the backing store. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, balanced trees are efficient, persistent, and still leave us wanting.
+When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced tree--are a natural choice. Common set operations, such as membership testing and persistent addition map naturally to the native operations of the backing store. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, red-black trees are efficient, persistent, and still leave us wanting.
 
+To see why, let's briefly review what makes red-black trees so special. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the invariants that
+\begin{enumerate}
+\item every red node has two black children, and
+\item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are always colored black.} node contains the same number of black nodes.
+\end{enumerate}
+These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being the number of red nodes interspersed along the way), and so the worst-case penalty for a tree search is a reasonable constant factor.
 
+Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion. In doing so, he exposed another deficiency: the delete operation. In other work \cite{okasaki1999purely}, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright. This defers a rebalancing operation, but does not bypass it. It also has a few disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked. [Show example if need content.] Second, retaining references to the node data prevents it from being garbage-collected. [Elaborate if need content.]
 
 
 The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
@@ -56,10 +63,7 @@ An immediate delete localizes the (conceptual /and/ time) complexity of the data
 
 A red-black tree must satisfy two invariants:
 
-\begin{enumerate}
-\item No red node has a red parent.
-\item Every path from the root to an empty node contains the same number of black nodes.
-\end{enumerate}
+
 
 The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
 
