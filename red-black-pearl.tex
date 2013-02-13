@@ -138,70 +138,70 @@ balance B (T R (T R a x b) y c) z d
 balance color a x b = T color a x b
 \end{verbatim}
 
-The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
+%The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
 
-Removal of [Okasaki] nodes from trees can be accomplished by marking a node as deleted and deferring the actual removal to a batch removal performed when deleted nodes begin to outnumber the others. This operation gives even lower than amortized logarithmic time complexity and doesn't interfere with the complexity of other tree operations.
+%Removal of [Okasaki] nodes from trees can be accomplished by marking a node as deleted and deferring the actual removal to a batch removal performed when deleted nodes begin to outnumber the others. This operation gives even lower than amortized logarithmic time complexity and doesn't interfere with the complexity of other tree operations.
 
-What is the argument for a removal operation with immediate complexity of O(log n)?
-Okasaki's thesis, page 50 (as numbered), par. 3: this mentions the cost of marking the node as deleted, but doesn't factor it into the amortized cost, correct? If we have n nodes and "delete" n/2, that takes (n log n)/2 operations. The rebuild takes n operations. So the amortized complexity is [(n log n)/2 + n]/(n/2)=log n + 1/2, or log n. So, the complexity is the same, but there is a constant factor. What happens if we add and remove the element multiple times. The addition has an immediate complexity and so is taken care of. The deletion has an amortized complexity, but say each deleted node was added and deleted k times. Then more deletes are happening over which the n/2 cost is spread, so it's actually better.
+%What is the argument for a removal operation with immediate complexity of O(log n)?
+%Okasaki's thesis, page 50 (as numbered), par. 3: this mentions the cost of marking the node as deleted, but doesn't factor it into the amortized cost, correct? If we have n nodes and "delete" n/2, that takes (n log n)/2 operations. The rebuild takes n operations. So the amortized complexity is [(n log n)/2 + n]/(n/2)=log n + 1/2, or log n. So, the complexity is the same, but there is a constant factor. What happens if we add and remove the element multiple times. The addition has an immediate complexity and so is taken care of. The deletion has an amortized complexity, but say each deleted node was added and deleted k times. Then more deletes are happening over which the n/2 cost is spread, so it's actually better.
 
-An immediate delete localizes the (conceptual /and/ time) complexity of the data structure. (Conceptually, because a counter needs to be kept in the other case, unless you want to incur an O(n) operation every time you want to delete.)
+%An immediate delete localizes the (conceptual /and/ time) complexity of the data structure. (Conceptually, because a counter needs to be kept in the other case, unless you want to incur an O(n) operation every time you want to delete.)
 
-A red-black tree must satisfy two invariants:
+%A red-black tree must satisfy two invariants:
 
 
 
-The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
+%The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
 
-There are x operations generally defined for red-black trees.
+%There are x operations generally defined for red-black trees.
 
-Red-black trees are typically used as the backing store for finite subsets of 
-a totally-ordered set or finite maps with a totally-ordered domain.
+%Red-black trees are typically used as the backing store for finite subsets of 
+%a totally-ordered set or finite maps with a totally-ordered domain.
 
-Emphasize that we would like to localize the complexity.
+%Emphasize that we would like to localize the complexity.
 
-If we mark nodes as deleted, every operation must know about deleted nodes.
-In order to add the delete operation [in this way], we must modify every 
-other operation.
+%If we mark nodes as deleted, every operation must know about deleted nodes.
+%In order to add the delete operation [in this way], we must modify every 
+%other operation.
 
-THIS IS BIG: real research is going to come from a question in the form of
-"prove or disprove". Being told something is true (or good) and asked to 
-justify it is going to lead to disintegrity.
+%THIS IS BIG: real research is going to come from a question in the form of
+%"prove or disprove". Being told something is true (or good) and asked to 
+%justify it is going to lead to disintegrity.
 
-First, the implementation of a simple binary tree.
+%First, the implementation of a simple binary tree.
 
-data Tree a = Empty | Node a (Tree a) (Tree a)
+%data Tree a = Empty | Node a (Tree a) (Tree a)
 
-insert :: (Ord a) => Tree a -> a -> Tree a
-insert Empty x = Node x Empty Empty
-insert (Node y l r) x = | x < y     -> Node y (insert l x) r
-                        | otherwise -> Node y l (insert r x)
+%insert :: (Ord a) => Tree a -> a -> Tree a
+%insert Empty x = Node x Empty Empty
+%insert (Node y l r) x = | x < y     -> Node y (insert l x) r
+%                        | otherwise -> Node y l (insert r x)
 
-count :: Tree a -> Int
-count Empty = 0
-count (Node \_ l r) = 1 + (count l) + (count r)
+%count :: Tree a -> Int
+%count Empty = 0
+%count (Node \_ l r) = 1 + (count l) + (count r)
 
-member :: (Ord a) => Tree a -> a -> Boolean
-member Empty \_ = False
-member (Node y l r) x = x < y     -> member l x
-                        x > y     -> member r x
-                        otherwise -> True
+%member :: (Ord a) => Tree a -> a -> Boolean
+%member Empty \_ = False
+%member (Node y l r) x = x < y     -> member l x
+%                        x > y     -> member r x
+%                        otherwise -> True
 
-Deletion in a binary tree is fairly straightforward.
+%Deletion in a binary tree is fairly straightforward.
 
-delete :: (Ord a) => Tree a -> a -> Tree a
-delete Empty \_ = Empty
-delete (Node x l Empty) x = l
-delete (Node x Empty r) x = r
-delete (Node x l (Node
-delete (Node y l r) x = x < y     -> Node y (delete l x) r
-                        x > y     -> Node y l (delete r x)
-                        otherwise ->
+%delete :: (Ord a) => Tree a -> a -> Tree a
+%delete Empty \_ = Empty
+%delete (Node x l Empty) x = l
+%delete (Node x Empty r) x = r
+%delete (Node x l (Node
+%delete (Node y l r) x = x < y     -> Node y (delete l x) r
+%                        x > y     -> Node y l (delete r x)
+%                        otherwise ->
 
-data Color = Red | Black
-data Tree a = Empty | Node Color a (Tree a) (Tree a)
+%data Color = Red | Black
+%data Tree a = Empty | Node Color a (Tree a) (Tree a)
 
-enforcing invariants with types leads to Byz
+%enforcing invariants with types leads to Byz
 
 Suppose the value we wish to delete happens to reside in a node at the bottom of the tree. There are two possibilites:
 
