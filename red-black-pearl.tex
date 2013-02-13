@@ -203,6 +203,18 @@ data Tree a = Empty | Node Color a (Tree a) (Tree a)
 
 enforcing invariants with types leads to Byz
 
+Suppose the value we wish to delete happens to reside in a node at the bottom of the tree. There are two possibilites:
+
+[red with black kids]
+
+[black with black kids]
+
+The delicate thing here is that we need to maintain the invariant that every path from the root of the tree to the bottom has the same number of black nodes. In the case that our value resides in a red node, we can intuitively see that replacing that entire subtree with a black leaf will preserve the invariant. A conceptual viewpoint that will serve us well is that the leaves donated their ``blackness'' to the parent, preserving the invariant. By applying the same idea to the second case, we must decide what happens when the ``blackness'' is propagated upward to a black node. As a conceptual convenience, we can temporarily assign the node a color of double black. This means that when counting the number of black nodes in a path which contains this node, we count this node twice. Of course, this is strictly for accounting purposes, and the node of course has the same computational cost to traverse as any other node. We will simply use this new color to account for bubbling which needs to travel up the tree.
+
+Now we can consider the cases that the node is not at the end of the tree. First, consider the case where the node in question has only one child subtree. In order for this occur, the node would have to be black with a red child. (And we can say even more about this child: it has no children of its own, else the tree would stray from the path invariant.) The child becomes the parent and is made black. [Can we motivate this with the color arithmetic?]
+
+learn the algorithm and then think about it.
+
 \section{Conclusion}
 It is true that genuine deletion is complex, but its complexity is fairly localized. Aside from the \texttt{delete} function proper, it requires the extension of the \texttt{Color} datatype to support two more atomic variants and a few helper functions to support color arithmetic. [It's a small price to pay.] In exchange, we receive O(log n) direct time complexity without any additional constant factor above the original implementation.
 
