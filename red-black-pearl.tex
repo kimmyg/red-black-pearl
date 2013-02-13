@@ -17,7 +17,7 @@
 \titlebanner{Red-Black Tree Deletion}        % These are ignored unless
 \preprintfooter{Presents the missing method of Okasaki's red-black trees.}   % 'preprint' option specified.
 
-\title{The Curse of the Red-Black Tree}
+\title{Deletion: The Curse of the Red-Black Tree}
 \subtitle{Functional Pearl}
 
 \authorinfo{Kimball Germane\and Matt Might}
@@ -47,10 +47,96 @@ To see why, let's briefly review what makes red-black trees so special. A red-bl
 \item every red node has two black children, and
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are always colored black.} node contains the same number of black nodes.
 \end{enumerate}
-These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being the number of red nodes interspersed along the way), and so the worst-case penalty for a tree search is a reasonable constant factor.
+These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty for a tree search is a reasonable constant factor.
 
-Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion. In doing so, he overcame one deficiency and exposed another: the delete operation. To support this operation, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright \cite[p. 50]{okasaki1996purely}. This approach trades a rebalancing operation at removal for a global tree rebuild at time indeterminate ( and preserves time complexity only by amortizing the cost). This approach has other disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked [, and the global rebuild condition must be tracked]. [Show example if need content.] Second, retaining references to ``deleted'' node data prevents it from being garbage-collected. [Elaborate if need content.]
+Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion. In doing so, he overcame one deficiency and exposed another: the delete operation. Multiple strategies have been developed to offer the delete operation, but each has its own weakness.
 
+Suppose we have a basic implementation of a red-black tree in a language that supports variants and pattern matching. Following Okasaki \cite{okasaki1999functional}, such an implementation might look like this:
+
+\begin{verbatim}
+data Color = R | B
+data Tree a = E | T Color (Tree a) a (Tree a)
+
+type Set a = Tree a
+
+empty :: Set a
+empty = E
+
+member :: Ord a => a -> Set a -> Bool
+member x E = False
+member x (T _ l y r) | x <  y = member x l
+                     | x == y = True
+                     | x >  y = member x r 
+
+insert :: (Ord a) => a -> Set a -> Set a
+insert x s = makeBlack (ins s)
+  where ins E = T R E x E
+        ins (T color l y r) | x <  y = balance color (ins l) y r
+                            | x == y = T color a y b
+                            | x >  y = balance color l y (ins r)
+        makeBlack (T _ l y r) = T B l y r
+\end{verbatim}
+Once the need for balancing is properly motivated and intuition described, the [novelty,bulk,workhorse,?] of the algorithm lies in the \texttt{balance} operation. The punchline of Okasaki's exposition is this simple, elegant implementation.
+\begin{verbatim}
+balance B (T R (T R a x b) y c) z d
+     || B (T R a x (T R b y c)) z d
+     || B a x (T R (T R b y c) z d)
+     || B a x (T R b y (T R c z d)) = T R (T B a x b) y (T B c z d)
+balance color a x b = T color a x b
+\end{verbatim}
+
+Red-black trees have a local [more like recursive] invariant which induces a global property.
+
+\section{Deletion}
+
+To support this operation, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright \cite[p. 50]{okasaki1996purely}. This approach trades a rebalancing operation at removal for a global tree rebuild at time indeterminate ( and preserves time complexity only by amortizing the cost). This approach has other disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked [, and the global rebuild condition must be tracked]. [Show example if need content.] Second, retaining references to ``deleted'' node data prevents it from being garbage-collected. [Elaborate if need content.]
+
+To support deletion using this strategy, we first introduce a flag in the datatype indicating whether the element should be considered present or not, and teach the operations on that data type about the flag.
+\begin{verbatim}
+data Color = R | B
+data Tree a = E | T Color Bool (Tree a) a (Tree a)
+
+type Set a = Tree a
+
+empty :: Set a
+empty = E
+
+member :: Ord a => a -> Set a -> Bool
+member x E = False
+member x (T _ f l y r) | x <  y = member x l
+                       | x == y = f
+                       | x >  y = member x r 
+
+insert :: (Ord a) => a -> Set a -> Set a
+insert x s = makeBlack (ins s)
+  where ins E = T R True E x E
+        ins (T color flag a y b) | x <  y = balance color flag (ins a) y b
+                                 | x == y = T color True a y b
+                                 | x >  y = balance color flag a y (ins b)
+        makeBlack (T _ f a y b) = T B flag a y b
+\end{verbatim}
+We omit the corresponding changes to \texttt{balance}. With that in place, a first pass at a \cite{delete} operation can be made:
+\begin{verbatim}
+delete :: Ord a -> a -> Set a -> Set a
+delete x E = E
+delete x (T color flag a y b) | x <  y = T color flag (delete x a) y b
+                              | x == y = T color False a y b
+                              | x >  y = T color flag a y (delete x b)
+\end{verbatim}
+The implementation is certainly correct, but it removes the time complexity guarantee that is worth the conceptual complexity. In order to preserve that, we introduce the necessary bookkeeping to trigger a global rebuild at the proper time.
+\begin{verbatim}
+data Color = R | B
+data Tree a = E | T Color Bool Int Int (Tree a) a (Tree a)
+...
+\end{verbatim}
+Once the need for balancing is properly motivated and intuition described, the [novelty,bulk,workhorse,?] of the algorithm lies in the \texttt{balance} operation. The punchline of Okasaki's exposition is this simple, elegant implementation.
+\begin{verbatim}
+balance B (T R (T R a x b) y c) z d
+     || B (T R a x (T R b y c)) z d
+     || B a x (T R (T R b y c) z d)
+     || B a x (T R b y (T R c z d)) = T R (T B a x b) y (T B c z d)
+balance color a x b = T color a x b
+\end{verbatim}
 
 The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
 
@@ -117,6 +203,8 @@ data Tree a = Empty | Node Color a (Tree a) (Tree a)
 
 enforcing invariants with types leads to Byz
 
+\section{Conclusion}
+It is true that genuine deletion is complex, but its complexity is fairly localized. Aside from the \texttt{delete} function proper, it requires the extension of the \texttt{Color} datatype to support two more atomic variants and a few helper functions to support color arithmetic. [It's a small price to pay.] In exchange, we receive O(log n) direct time complexity without any additional constant factor above the original implementation.
 
 \appendix
 \section{Appendix Title}
