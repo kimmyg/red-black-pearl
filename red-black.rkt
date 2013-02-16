@@ -83,29 +83,37 @@
     [(N _ (L) x _) x]
     [(N _ a _ _) (min a)]))
 
+(define-match-expander BB!
+  (syntax-rules ()
+    [(_ a) (or (? BB? a)
+               (and (N 'BB _ _ _) a))]))
+
+(define -B
+  (match-lambda
+    [(BB) (L)]
+    [(N 'BB a x b) (N 'B a x b)]
+    [a (error '-B "unsupported node ~a" a)]))
+
 (define rotate
   (match-lambda
-    [(N 'R (BB) x (N 'B a y b))
-     (N 'B (N 'R (L) x a) y b)]
-    [(N 'R (N 'BB a x b) y (N 'B c z d))
-     (N 'B (N 'R (N 'B a x b) y c) z d)]
-    [(N 'R (N 'B a x b) y (BB))
-     (N 'B a x (N 'R b y (L)))]
-    [(N 'R (N 'B a x b) y (N 'BB c z d))
-     (N 'B a x (N 'R b y (N 'B c z d)))]
+    [(N 'R (BB! a) x (N 'B b y c))
+     (N 'B (N 'R (-B a) x b) y c)]
+    [(N 'R (N 'B a x b) y (BB! c))
+     (N 'B a x (N 'R b y (-B c)))]
     
-    [(N 'B (BB) x (N 'B (L) y (L))) ;1
-     (N 'BB (N 'R (L) x (L)) y (L))]
+    [(N 'B (BB! a) x (N 'B b y c))
+     (N 'BB (N 'R (-B a) x b) y c)]
+    
     [(N 'B (BB) w (N 'B (N 'R (L) x (L)) y (N 'R (L) z (L)))) ;2
      (N 'B (N 'B (L) w (N 'R (L) x (L))) y (N 'B (L) z (L)))]
-    [(N 'B (N 'BB a x b) y (N 'B c z d)) ;3
-     (N 'BB (N 'R (N 'B a x b) y c) z d)]
+    
     [(N 'B (N 'B (L) x (L)) y (BB)) ;1r
      (N 'BB (L) x (N 'R (L) y (L)))]
-    [(N 'B (N 'B (N 'R (L) w (L)) x (N 'R (L) y (L))) z (BB)) ;2r
-     (N 'B (N 'B (L) w (L)) x (N 'B (N 'R (L) y (L)) z (L)))]
     [(N 'B (N 'B a x b) y (N 'BB c z d)) ;3r
      (N 'BB a x (N 'R b y (N 'B c z d)))]
+    [(N 'B (N 'B (N 'R (L) w (L)) x (N 'R (L) y (L))) z (BB)) ;2r
+     (N 'B (N 'B (L) w (L)) x (N 'B (N 'R (L) y (L)) z (L)))]
+    
     
     [(or (N 'B (N 'B (L) x (N 'R (L) y (L))) z (BB))
          (N 'B (N 'B (N 'R (L) x (L)) y (L)) z (BB)))
