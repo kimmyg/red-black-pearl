@@ -253,7 +253,8 @@
 
 (for ([n 6])
   (let ([k (expt 2 (* (add1 n) 2))])
-    (printf "testing trees of height ~a (~a times)" (add1 n) k)
+    (printf "testing trees of height ~a (~a times)..." (add1 n) k)
+    (flush-output)
     (for ([i k])
       (let ([t (random-numbered-tree (add1 n))])
         (for ([x (members t)])
