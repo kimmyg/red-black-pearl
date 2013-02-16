@@ -1,5 +1,6 @@
 #lang racket/base
-(require racket/list
+(require racket/contract
+         racket/list
          racket/match)
 
 (struct RB-tree () #:transparent)
@@ -58,7 +59,6 @@
 
 (define blacken
   (match-lambda
-    [(BB) (L)]
     [(N _ l v r)
      (N 'B l v r)]
     [t t]))
@@ -84,33 +84,27 @@
 
 (define rotate
   (match-lambda
-    [(N 'B (L) x (L)) (N 'B (L) x (L))]
-    [(N 'B (L) x (N 'R (L) y (L))) (N 'B (L) x (N 'R (L) y (L)))]
-    [(N 'B (N 'R (L) x (L)) y (L)) (N 'B (N 'R (L) x (L)) y (L))]
-    [(N 'R (N 'B a x b) y (N 'B c z d)) (N 'R (N 'B a x b) y (N 'B c z d))]
-    [(N 'B (N 'B a x b) y (N 'R c z d)) (N 'B (N 'B a x b) y (N 'R c z d))]
-    [(N 'B (N 'R a x b) y (N 'B c z d)) (N 'B (N 'R a x b) y (N 'B c z d))]
-    [(N 'B (N 'R a x b) y (N 'R c z d)) (N 'B (N 'R a x b) y (N 'R c z d))]
-    [(N 'B (N 'B a x b) y (N 'B c z d)) (N 'B (N 'B a x b) y (N 'B c z d))]
     [(N 'R (BB) x (N 'B a y b))
      (N 'B (N 'R (L) x a) y b)]
     [(N 'R (N 'B a x b) y (BB))
      (N 'B a x (N 'R b y (L)))]
-    [(N 'B (BB) x (N 'R a y b))
-     (N 'B (N 'R (L) x a) y b)]
-    [(N 'B (N 'R a x b) y (BB))
-     (N 'B a x (N 'R b y (L)))]
+    [(N 'B (BB) w (N 'R (N 'B a x b) y (N 'B c z d)))
+     (N 'B (balance (N 'B (N 'R (L) w a) x b)) y (N 'B c z d))]
+    [(N 'B (N 'R (N 'B a w b) x (N 'B c y d)) z (BB))
+     (N 'B (N 'B a w b) x (balance (N 'B c y (N 'R d z (L)))))]
     [(N 'B (BB) x (N 'B (L) y (L)))
-     (N 'BB (L) x (N 'R (L) y (L)))]
-    [(N 'B (N 'B (L) x (L)) y (BB))
      (N 'BB (N 'R (L) x (L)) y (L))]
-    [(N 'B (N 'B (L) x (N 'R (L) y (L))) z (BB))
+    [(N 'B (N 'BB a x b) y (N 'B c z d))
+     (N 'BB (N 'R (N 'B a x b) y c) z d)]
+    [(N 'B (N 'B (L) x (L)) y (BB))
+     (N 'BB (L) x (N 'R (L) y (L)))]
+    [(N 'B (N 'B a x b) y (N 'BB c z d))
+     (N 'BB a x (N 'R b y (N 'B c z d)))]
+    [(or (N 'B (N 'B (L) x (N 'R (L) y (L))) z (BB))
+         (N 'B (N 'B (N 'R (L) x (L)) y (L)) z (BB)))
      (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    [(N 'B (N 'B (N 'R (L) x (L)) y (L)) z (BB))
-     (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    [(N 'B (BB) x (N 'B (N 'R (L) y (L)) z (L)))
-     (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    [(N 'B (BB) x (N 'B (L) y (N 'R (L) z (L))))
+    [(or (N 'B (BB) x (N 'B (N 'R (L) y (L)) z (L)))
+         (N 'B (BB) x (N 'B (L) y (N 'R (L) z (L)))))
      (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
     [(N 'B (BB) w (N 'B (N 'R (L) x (L)) y (N 'R (L) z (L))))
      (N 'B (N 'B (L) w (N 'R (L) x (L))) y (N 'B (L) z (L)))]
@@ -124,15 +118,10 @@
      (N 'B (N 'B a v b) w (balance (N 'B c x (N 'R d y (N 'B e z f)))))]
     [(N 'B (N 'BB a v b) w (N 'R (N 'B c x d) y (N 'B e z f)))
      (N 'B (balance (N 'B (N 'R (N 'B a v b) w c) x d)) y (N 'B e z f))]
-    [(N 'B (N 'B a x b) y (N 'BB c z d))
-     (N 'BB a x (N 'R b y (N 'B c z d)))]
-    [(N 'B (N 'BB a x b) y (N 'B c z d))
-     (N 'BB (N 'R (N 'B a x b) y c) z d)]
-    [t (error 'rotate "unhandled tree ~a" t)]))
+    [t t]))
 
 (define blacken-if-needed
   (match-lambda
-    [(BB) (L)]
     [(N 'R (N 'R a x b) y c)
      (N 'B (N 'R a x b) y c)]
     [(N 'R a x (N 'R b y c))
@@ -155,10 +144,8 @@
        (L)]
       [(N 'B (L) (== v) (L))
        (BB)]
-      [(N 'B (L) (== v) (N 'R (L) x (L)))
-       (N 'B (L) x (L))]
-      [(N 'B (N 'R (L) x (L)) (== v) (L))
-       (N 'B (L) x (L))]
+      [(N 'B (N 'R a x b) (== v) (L))
+       (N 'B a x b)]
       [(N c a x b)
        (switch-compare
         (cmp v x)
@@ -189,18 +176,14 @@
 (define global-invariant?
   (match-lambda
     [(L) 1]
-    [(N c a _ b)
+    [(N (? (or/c 'R 'B) c) a _ b)
      (let ([a-length (global-invariant? a)]
            [b-length (global-invariant? b)])
        (and a-length
             b-length
             (= a-length b-length)
-            (+ a-length (if (eq? c 'B) 1 0))))]))
-
-(define (invariant? t)
-  (and (local-invariant? t)
-       (global-invariant? t)
-       #t))
+            (+ a-length (if (eq? c 'B) 1 0))))]
+    [_ #f]))
 
 (define (random-tree h [red-ok? #t])
   (if (and red-ok? (zero? (random 2)))
@@ -247,11 +230,11 @@
                                    (raise e))])
         (let ([t- (delete t x <)])
           (and (not (member? t- x <))
-               (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
-               (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
+               (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
+               (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))
                #t)))))
 
-(for ([n 6])
+(for ([n 5])
   (let ([k (expt 2 (* (add1 n) 2))])
     (printf "testing trees of height ~a (~a times)..." (add1 n) k)
     (flush-output)
@@ -266,7 +249,7 @@
                                        (raise e))])
             (let ([t- (delete t x <)])
               (and (not (member? t- x <))
-                   (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
-                   (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
+                   (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
+                   (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))
                    #t))))))
     (printf "done~n")))
