@@ -86,36 +86,39 @@
   (match-lambda
     [(N 'R (BB) x (N 'B a y b))
      (N 'B (N 'R (L) x a) y b)]
+    [(N 'R (N 'BB a x b) y (N 'B c z d))
+     (N 'B (N 'R (N 'B a x b) y c) z d)]
     [(N 'R (N 'B a x b) y (BB))
      (N 'B a x (N 'R b y (L)))]
-    [(N 'B (BB) w (N 'R (N 'B a x b) y (N 'B c z d)))
-     (N 'B (balance (N 'B (N 'R (L) w a) x b)) y (N 'B c z d))]
-    [(N 'B (N 'R (N 'B a w b) x (N 'B c y d)) z (BB))
-     (N 'B (N 'B a w b) x (balance (N 'B c y (N 'R d z (L)))))]
-    [(N 'B (BB) x (N 'B (L) y (L)))
+    [(N 'R (N 'B a x b) y (N 'BB c z d))
+     (N 'B a x (N 'R b y (N 'B c z d)))]
+    
+    [(N 'B (BB) x (N 'B (L) y (L))) ;1
      (N 'BB (N 'R (L) x (L)) y (L))]
-    [(N 'B (N 'BB a x b) y (N 'B c z d))
+    [(N 'B (BB) w (N 'B (N 'R (L) x (L)) y (N 'R (L) z (L)))) ;2
+     (N 'B (N 'B (L) w (N 'R (L) x (L))) y (N 'B (L) z (L)))]
+    [(N 'B (N 'BB a x b) y (N 'B c z d)) ;3
      (N 'BB (N 'R (N 'B a x b) y c) z d)]
-    [(N 'B (N 'B (L) x (L)) y (BB))
+    [(N 'B (N 'B (L) x (L)) y (BB)) ;1r
      (N 'BB (L) x (N 'R (L) y (L)))]
-    [(N 'B (N 'B a x b) y (N 'BB c z d))
+    [(N 'B (N 'B (N 'R (L) w (L)) x (N 'R (L) y (L))) z (BB)) ;2r
+     (N 'B (N 'B (L) w (L)) x (N 'B (N 'R (L) y (L)) z (L)))]
+    [(N 'B (N 'B a x b) y (N 'BB c z d)) ;3r
      (N 'BB a x (N 'R b y (N 'B c z d)))]
+    
     [(or (N 'B (N 'B (L) x (N 'R (L) y (L))) z (BB))
          (N 'B (N 'B (N 'R (L) x (L)) y (L)) z (BB)))
      (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
     [(or (N 'B (BB) x (N 'B (N 'R (L) y (L)) z (L)))
          (N 'B (BB) x (N 'B (L) y (N 'R (L) z (L)))))
      (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    [(N 'B (BB) w (N 'B (N 'R (L) x (L)) y (N 'R (L) z (L))))
-     (N 'B (N 'B (L) w (N 'R (L) x (L))) y (N 'B (L) z (L)))]
-    [(N 'B (N 'B (N 'R (L) w (L)) x (N 'R (L) y (L))) z (BB))
-     (N 'B (N 'B (L) w (L)) x (N 'B (N 'R (L) y (L)) z (L)))]
-    [(N 'R (N 'BB a x b) y (N 'B c z d))
-     (N 'B (N 'R (N 'B a x b) y c) z d)]
-    [(N 'R (N 'B a x b) y (N 'BB c z d))
-     (N 'B a x (N 'R b y (N 'B c z d)))]
+    
+    [(N 'B (N 'R (N 'B a w b) x (N 'B c y d)) z (BB))
+     (N 'B (N 'B a w b) x (balance (N 'B c y (N 'R d z (L)))))]
     [(N 'B (N 'R (N 'B a v b) w (N 'B c x d)) y (N 'BB e z f))
      (N 'B (N 'B a v b) w (balance (N 'B c x (N 'R d y (N 'B e z f)))))]
+    [(N 'B (BB) w (N 'R (N 'B a x b) y (N 'B c z d)))
+     (N 'B (balance (N 'B (N 'R (L) w a) x b)) y (N 'B c z d))]
     [(N 'B (N 'BB a v b) w (N 'R (N 'B c x d) y (N 'B e z f)))
      (N 'B (balance (N 'B (N 'R (N 'B a v b) w c) x d)) y (N 'B e z f))]
     [t t]))
@@ -208,10 +211,6 @@
                    [(r n) (number-tree r (add1 n))])
        (values (N c l v r) n))]))
 
-(define (random-numbered-tree h)
-  (let-values ([(t n) (number-tree (random-tree h))])
-    t))
-
 (define ts
   (list (N 'B (L) 1 (N 'R (L) 2 (L)))
         (N 'B (L) 1 (L))
@@ -220,36 +219,31 @@
 
 ;(random-numbered-tree 2)
 
-#;(for ([t ts])
-    (for ([x (members t)])
-      (with-handlers ([exn:fail? (λ (e)
-                                   (print t)
-                                   (newline)
-                                   (print x)
-                                   (newline)
-                                   (raise e))])
-        (let ([t- (delete t x <)])
-          (and (not (member? t- x <))
-               (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
-               (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))
-               #t)))))
+(define (test-tree t)
+  (for/and ([x (members t)])
+    (with-handlers ([exn:fail? (λ (e)
+                                 (print t)
+                                 (newline)
+                                 (print x)
+                                 (newline)
+                                 (raise e))])
+      (let ([t- (delete t x <)])
+        (and (not (member? t- x <))
+             (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
+             (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-)))))))
 
-(for ([n 5])
+
+
+
+#;(for/and ([t ts])
+  (test-tree t))
+
+(for/and ([n 5])
   (let ([k (expt 2 (* (add1 n) 2))])
     (printf "testing trees of height ~a (~a times)..." (add1 n) k)
     (flush-output)
-    (for ([i k])
-      (let ([t (random-numbered-tree (add1 n))])
-        (for ([x (members t)])
-          (with-handlers ([exn:fail? (λ (e)
-                                       (print t)
-                                       (newline)
-                                       (print x)
-                                       (newline)
-                                       (raise e))])
-            (let ([t- (delete t x <)])
-              (and (not (member? t- x <))
-                   (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
-                   (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))
-                   #t))))))
+    (for/and ([i k])
+      (let-values ([(t n) (number-tree (random-tree (add1 n)))])
+        ;(displayln n)
+        (test-tree t)))
     (printf "done~n")))
