@@ -49,6 +49,11 @@
          (N 'B a x (N 'R (N 'R b y c) z d))
          (N 'B a x (N 'R b y (N 'R c z d))))
      (N 'R (N 'B a x b) y (N 'B c z d))]
+    [(or (N 'BB (N 'R (N 'R a x b) y c) z d)
+         (N 'BB (N 'R a x (N 'R b y c)) z d)
+         (N 'BB a x (N 'R (N 'R b y c) z d))
+         (N 'BB a x (N 'R b y (N 'R c z d))))
+     (N 'B (N 'B a x b) y (N 'B c z d))]
     [t t]))
 
 (define blacken
@@ -115,9 +120,15 @@
      (N 'B (N 'R (N 'B a x b) y c) z d)]
     [(N 'R (N 'B a x b) y (N 'BB c z d))
      (N 'B a x (N 'R b y (N 'B c z d)))]
+    [(N 'B (N 'R (N 'B a v b) w (N 'B c x d)) y (N 'BB e z f))
+     (N 'B (N 'B a v b) w (balance (N 'B c x (N 'R d y (N 'B e z f)))))]
+    [(N 'B (N 'BB a v b) w (N 'R (N 'B c x d) y (N 'B e z f)))
+     (N 'B (balance (N 'B (N 'R (N 'B a v b) w c) x d)) y (N 'B e z f))]
+    [(N 'B (N 'B a x b) y (N 'BB c z d))
+     (N 'BB a x (N 'R b y (N 'B c z d)))]
+    [(N 'B (N 'BB a x b) y (N 'B c z d))
+     (N 'BB (N 'R (N 'B a x b) y c) z d)]
     [t (error 'rotate "unhandled tree ~a" t)]))
-
-
 
 (define blacken-if-needed
   (match-lambda
@@ -227,31 +238,34 @@
 ;(random-numbered-tree 2)
 
 #;(for ([t ts])
-  (for ([x (members t)])
-    (with-handlers ([exn:fail? (λ (e)
-                                 (print t)
-                                 (newline)
-                                 (print x)
-                                 (newline)
-                                 (raise e))])
-      (let ([t- (delete t x <)])
-        (and (not (member? t- x <))
-             (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
-             (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
-             #t)))))
+    (for ([x (members t)])
+      (with-handlers ([exn:fail? (λ (e)
+                                   (print t)
+                                   (newline)
+                                   (print x)
+                                   (newline)
+                                   (raise e))])
+        (let ([t- (delete t x <)])
+          (and (not (member? t- x <))
+               (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
+               (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
+               #t)))))
 
-(for ([n 5])
-  (for ([i 100])
-    (let ([t (random-numbered-tree (add1 n))])
-      (for ([x (members t)])
-        (with-handlers ([exn:fail? (λ (e)
-                                     (print t)
-                                     (newline)
-                                     (print x)
-                                     (newline)
-                                     (raise e))])
-          (let ([t- (delete t x <)])
-            (and (not (member? t- x <))
-                 (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
-                 (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
-                 #t)))))))
+(for ([n 6])
+  (let ([k (expt 2 (* (add1 n) 2))])
+    (printf "testing trees of height ~a (~a times)" (add1 n) k)
+    (for ([i k])
+      (let ([t (random-numbered-tree (add1 n))])
+        (for ([x (members t)])
+          (with-handlers ([exn:fail? (λ (e)
+                                       (print t)
+                                       (newline)
+                                       (print x)
+                                       (newline)
+                                       (raise e))])
+            (let ([t- (delete t x <)])
+              (and (not (member? t- x <))
+                   (or (global-invariant? t) (error 'global "removing ~a from ~a to get ~a" x t t-))
+                   (or (local-invariant? t) (error 'local "removing ~a from ~a to get ~a" x t t-))
+                   #t))))))
+    (printf "done~n")))
