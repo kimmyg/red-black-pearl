@@ -1,7 +1,8 @@
 #lang racket/base
 (require racket/contract
          racket/list
-         racket/match)
+         racket/match
+         racket/port)
 
 (provide empty-tree
          member?
@@ -153,7 +154,7 @@
        (L)]
       [(B! (L) (== v) (L))
        (BB)]
-      [(B! (N 'R a x b) (== v) (L))
+      [(B! (R! a x b) (== v) (L))
        (B! a x b)]
       [(N c a x b)
        (switch-compare
@@ -194,6 +195,10 @@
               (+ a-length (if (eq? c 'B) 1 0))))]
       [_ #f]))
   
+  (define (ordered? t)
+    (let ([xs (members t)])
+      (or (< (length xs) 2) (apply < xs))))
+  
   (define (random-tree h [red-ok? #t])
     (if (and red-ok? (zero? (random 2)))
         (N 'R
@@ -225,18 +230,42 @@
   
   ;(random-numbered-tree 2)
   
+  (define (time-tree t)
+    (let ([xs (members t)])
+      (displayln (regexp-match
+                  #px#""
+                  (with-output-to-string
+                   (λ ()
+                     (time
+                      (for ([x xs])
+                        (delete t x <)))))))
+      (time
+       (for/fold ([t t])
+         ([x xs])
+         (delete t x <)))))
+  
   (define (test-tree t)
-    (for/and ([x (members t)])
-      (with-handlers ([exn:fail? (λ (e)
-                                   (print t)
-                                   (newline)
-                                   (print x)
-                                   (newline)
-                                   (raise e))])
-        (let ([t- (delete t x <)])
-          (and (not (member? t- x <))
-               (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
-               (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-)))))))
+    (let ([xs (members t)])
+      (and (for/and ([x (members t)])
+             (with-handlers ([exn:fail? (λ (e)
+                                          (print t)
+                                          (newline)
+                                          (print x)
+                                          (newline)
+                                          (raise e))])
+               (let ([t- (delete t x <)])
+                 (and (not (member? t- x <))
+                      (or (ordered? t) (error 'ordered "removing ~a from ~a to get ~a" x t t-))
+                      (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
+                      (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))))))
+           (L? (for/fold ([t t])
+                 ([x xs])
+                 (let ([t- (delete t x <)])
+                   (and (not (member? t- x <))
+                        (or (ordered? t) (error 'ordered "removing ~a from ~a to get ~a" x t t-))
+                        (or (global-invariant? t-) (error 'global "removing ~a from ~a to get ~a" x t t-))
+                        (or (local-invariant? t-) (error 'local "removing ~a from ~a to get ~a" x t t-))
+                        t-)))))))
   
   
   
@@ -249,47 +278,81 @@
       ((ids es) ...)
       (max m (begin body ...))))
   
-  (for/and ([n 7])
-    (let ([k (expt 2 (* (add1 n) 2))])
-      (printf "testing trees of height ~a (~a times)..." (add1 n) k)
-      (displayln (for/max ([i k])
-                          (let-values ([(t n) (number-tree (random-tree (add1 n)))])
-                            (test-tree t)
-                            n)))
-      (printf "done~n")))
+  (define (mean-removal-time t)
+    (let ([xs (members t)])
+      (let ([ms (string->number
+                 (second
+                  (regexp-match
+                   #px"cpu time: (\\d+) "
+                   (with-output-to-string
+                    (λ ()
+                      (time
+                       (for ([i 100])
+                         (for ([x xs])
+                           (delete t x <)))))))))]
+            [n (length xs)])
+        (/ (/ (* ms 1000) 100) n))))
   
+  (for ([i 12])
+    (let* ([avg (exact->inexact
+                 (/ (for/sum ([j 100])
+                      (let-values ([(t n) (number-tree (random-tree (+ 2 i)))])
+                        (mean-removal-time t)))
+                    100))]
+           [k (/ (/ (log avg) (log 2)) (add1 i))])
+        (printf "~a ~a ~a~n" (add1 i) avg k)))
+  
+  #;(for/and ([n 7])
+      (let ([k (expt 2 (* (add1 n) 2))])
+        (printf "testing trees of height ~a (~a times)..." (add1 n) k)
+        (displayln (for/max ([i k])
+                            (let-values ([(t n) (number-tree (random-tree (add1 n)))])
+                              (test-tree t)
+                              n)))
+        (printf "done~n")))
+  
+  #;(for ([i 10])
+      (let*-values ([(t n) (number-tree (random-tree (add1 i)))]
+                    [(xs) (members t)])
+        (displayln n)
+        (let ([start (current-milliseconds)])
+          (for ([j 200])
+            (for ([x xs])
+              (delete t x <)))
+          (let ([end (current-milliseconds)])
+            (displayln (- end start))
+            (displayln (log (/ (- end start) (log n))))))))
   
   #;(let/ec escape
-    (displayln "deterministic insert")
-    (for/and ([i 1000])
-      (let ([t (for/fold ([t (L)])
-                 ([j i])
-                 (insert t j <))])
-        (or (invariant? t)
-            (escape t))))
-    (displayln "passed"))
+      (displayln "deterministic insert")
+      (for/and ([i 1000])
+        (let ([t (for/fold ([t (L)])
+                   ([j i])
+                   (insert t j <))])
+          (or (invariant? t)
+              (escape t))))
+      (displayln "passed"))
   
   #;(let/ec escape
-    (displayln "nondeterministic insert")
-    (for/and ([i 1000])
-      (let ([t (for/fold ([t (L)])
-                 ([j i])
-                 (insert t (random 1000) <))])
-        (or (invariant? t)
-            (escape t))))
-    (displayln "passed"))
+      (displayln "nondeterministic insert")
+      (for/and ([i 1000])
+        (let ([t (for/fold ([t (L)])
+                   ([j i])
+                   (insert t (random 1000) <))])
+          (or (invariant? t)
+              (escape t))))
+      (displayln "passed"))
   
   #;(let/ec escape
-    (displayln "deterministic delete")
-    (for/and ([i 100])
-      (let ([t (for/fold ([t (L)])
-                 ([j i])
-                 (insert t j <))])
-        (for/fold ([t t])
-          ([j i])
-          (let ([t- (delete-min t)])
-            (if (invariant? t-)
-                t-
-                (escape t))))))
-    (displayln "passed")))
-  
+      (displayln "deterministic delete")
+      (for/and ([i 100])
+        (let ([t (for/fold ([t (L)])
+                   ([j i])
+                   (insert t j <))])
+          (for/fold ([t t])
+            ([j i])
+            (let ([t- (delete-min t)])
+              (if (invariant? t-)
+                  t-
+                  (escape t))))))
+      (displayln "passed")))
