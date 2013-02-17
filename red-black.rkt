@@ -65,17 +65,17 @@
     [t t]))
 
 (define (insert t v cmp)
-  (define (insert-inner t v cmp)
+  (define (ins t v cmp)
     (match t
       [(L)
        (N 'R (L) v (L))]
       [(N c lc nv rc)
        (switch-compare
         (cmp v nv)
-        [< (balance (N c (insert-inner lc v cmp) nv rc))]
+        [< (balance (N c (ins lc v cmp) nv rc))]
         [= t]
-        [> (balance (N c lc nv (insert-inner rc v cmp)))])]))
-  (blacken-if-needed (insert-inner t v cmp)))
+        [> (balance (N c lc nv (ins rc v cmp)))])]))
+  (blacken (ins t v cmp)))
 
 (define min
   (match-lambda
@@ -85,88 +85,84 @@
 
 (define-match-expander BB!
   (syntax-rules ()
-    [(_ a) (or (? BB? a)
-               (and (N 'BB _ _ _) a))]))
+    [(_ a) (or (and (BB) a)
+               (and (N 'BB _ _ _) a))]
+    [(_ a x b) (N 'BB a x b)])
+  (syntax-rules ()
+    [(_ a x b) (N 'BB a x b)]))
+
+(define-match-expander B!
+  (syntax-rules ()
+    [(_ a) (or (and (L) a)
+               (and (N 'B _ _ _) a))]
+    [(_ a x b) (N 'B a x b)])
+  (syntax-rules ()
+    [(_ a x b) (N 'B a x b)]))
+
+(define-match-expander R!
+  (syntax-rules ()
+    [(_ a) (and (N 'R _ _ _) a)]
+    [(_ a x b) (N 'R a x b)])
+  (syntax-rules ()
+    [(_ a x b) (N 'R a x b)]))
 
 (define -B
   (match-lambda
     [(BB) (L)]
-    [(N 'BB a x b) (N 'B a x b)]
+    [(BB! a x b) (B! a x b)]
     [a (error '-B "unsupported node ~a" a)]))
 
 (define rotate
   (match-lambda
-    [(N 'R (BB! a) x (N 'B b y c))
-     (N 'B (N 'R (-B a) x b) y c)]
-    [(N 'R (N 'B a x b) y (BB! c))
-     (N 'B a x (N 'R b y (-B c)))]
+    [(R! (BB! a) x (B! b y c))
+     (balance (B! (R! (-B a) x b) y c))]
+    [(R! (B! a x b) y (BB! c))
+     (balance (B! a x (R! b y (-B c))))]
     
-    [(N 'B (BB! a) x (N 'B b y c))
-     (N 'BB (N 'R (-B a) x b) y c)]
+    [(B! (BB! a) x (B! b y c))
+     (balance (BB! (R! (-B a) x b) y c))]
+    [(B! (B! a x b) y (BB! c))
+     (balance (BB! a x (R! b y (-B c))))]
     
-    [(N 'B (BB) w (N 'B (N 'R (L) x (L)) y (N 'R (L) z (L)))) ;2
-     (N 'B (N 'B (L) w (N 'R (L) x (L))) y (N 'B (L) z (L)))]
+    [(B! (R! (B! a) x (B! b y c)) z (BB! d))
+     (B! a x (balance (B! b y (R! c z (-B d)))))]
+    [(B! (BB! a) x (R! (B! b y c) z (B! d)))
+     (B! (balance (B! (R! (-B a) x b) y c)) z d)]
     
-    [(N 'B (N 'B (L) x (L)) y (BB)) ;1r
-     (N 'BB (L) x (N 'R (L) y (L)))]
-    [(N 'B (N 'B a x b) y (N 'BB c z d)) ;3r
-     (N 'BB a x (N 'R b y (N 'B c z d)))]
-    [(N 'B (N 'B (N 'R (L) w (L)) x (N 'R (L) y (L))) z (BB)) ;2r
-     (N 'B (N 'B (L) w (L)) x (N 'B (N 'R (L) y (L)) z (L)))]
-    
-    
-    [(or (N 'B (N 'B (L) x (N 'R (L) y (L))) z (BB))
-         (N 'B (N 'B (N 'R (L) x (L)) y (L)) z (BB)))
-     (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    [(or (N 'B (BB) x (N 'B (N 'R (L) y (L)) z (L)))
-         (N 'B (BB) x (N 'B (L) y (N 'R (L) z (L)))))
-     (N 'B (N 'B (L) x (L)) y (N 'B (L) z (L)))]
-    
-    [(N 'B (N 'R (N 'B a w b) x (N 'B c y d)) z (BB))
-     (N 'B (N 'B a w b) x (balance (N 'B c y (N 'R d z (L)))))]
-    [(N 'B (N 'R (N 'B a v b) w (N 'B c x d)) y (N 'BB e z f))
-     (N 'B (N 'B a v b) w (balance (N 'B c x (N 'R d y (N 'B e z f)))))]
-    [(N 'B (BB) w (N 'R (N 'B a x b) y (N 'B c z d)))
-     (N 'B (balance (N 'B (N 'R (L) w a) x b)) y (N 'B c z d))]
-    [(N 'B (N 'BB a v b) w (N 'R (N 'B c x d) y (N 'B e z f)))
-     (N 'B (balance (N 'B (N 'R (N 'B a v b) w c) x d)) y (N 'B e z f))]
     [t t]))
 
-(define blacken-if-needed
+(define blacken
   (match-lambda
-    [(N 'R (N 'R a x b) y c)
-     (N 'B (N 'R a x b) y c)]
-    [(N 'R a x (N 'R b y c))
-     (N 'B a x (N 'R b y c))]
+    [(N 'R (R! a) x b)
+     (N 'B a x b)]
+    [(N 'R a x (R! b))
+     (N 'B a x b)]
     [t t]))
 
-(define redden-if-possible
+(define redden
   (match-lambda
-    [(N 'B (N 'B a x b) y (N 'B c z d))
-     (N 'R (N 'B a x b) y (N 'B c z d))]
-    [(N 'B (L) x (L))
-     (N 'R (L) x (L))]
+    [(N 'B (B! a) x (B! b))
+     (N 'R a x b)]
     [t t]))
 
 (define (delete t v cmp)
-  (define (delete-inner t v cmp)
+  (define (del t v cmp)
     (match t
       [(L) (L)]
-      [(N 'R (L) (== v) (L))
+      [(R! (L) (== v) (L))
        (L)]
-      [(N 'B (L) (== v) (L))
+      [(B! (L) (== v) (L))
        (BB)]
-      [(N 'B (N 'R a x b) (== v) (L))
-       (N 'B a x b)]
+      [(B! (N 'R a x b) (== v) (L))
+       (B! a x b)]
       [(N c a x b)
        (switch-compare
         (cmp v x)
-        [< (balance (rotate (N c (delete-inner a v cmp) x b)))]
+        [< (rotate (N c (del a v cmp) x b))]
         [= (let ([v (min b)])
-             (balance (rotate (N c a v (delete-inner b v cmp)))))]
-        [> (balance (rotate (N c a x (delete-inner b v cmp))))])]))
-  (delete-inner (redden-if-possible t) v cmp))
-
+             (rotate (N c a v (del b v cmp))))]
+        [> (rotate (N c a x (del b v cmp)))])]))
+  (del (redden t) v cmp))
 
 (module+ test
   (define black-node?
