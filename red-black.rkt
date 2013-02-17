@@ -52,29 +52,29 @@
 
 (define balance
   (match-lambda
-    [(or (N 'B (N 'R (N 'R a x b) y c) z d)
-         (N 'B (N 'R a x (N 'R b y c)) z d)
-         (N 'B a x (N 'R (N 'R b y c) z d))
-         (N 'B a x (N 'R b y (N 'R c z d))))
-     (N 'R (N 'B a x b) y (N 'B c z d))]
-    [(or (N 'BB (N 'R (N 'R a x b) y c) z d)
-         (N 'BB (N 'R a x (N 'R b y c)) z d)
-         (N 'BB a x (N 'R (N 'R b y c) z d))
-         (N 'BB a x (N 'R b y (N 'R c z d))))
-     (N 'B (N 'B a x b) y (N 'B c z d))]
+    [(or (B! (R! (R! a x b) y c) z d)
+         (B! (R! a x (R! b y c)) z d)
+         (B! a x (R! (R! b y c) z d))
+         (B! a x (R! b y (R! c z d))))
+     (R! (B! a x b) y (B! c z d))]
+    [(or (BB! (R! (R! a x b) y c) z d)
+         (BB! (R! a x (R! b y c)) z d)
+         (BB! a x (R! (R! b y c) z d))
+         (BB! a x (R! b y (R! c z d))))
+     (N 'B (B! a x b) y (B! c z d))]
     [t t]))
 
 (define (insert t v cmp)
   (define (ins t v cmp)
     (match t
       [(L)
-       (N 'R (L) v (L))]
-      [(N c lc nv rc)
+       (R! (L) v (L))]
+      [(N c a x b)
        (switch-compare
-        (cmp v nv)
-        [< (balance (N c (ins lc v cmp) nv rc))]
+        (cmp v x)
+        [< (balance (N c (ins a v cmp) x b))]
         [= t]
-        [> (balance (N c lc nv (ins rc v cmp)))])]))
+        [> (balance (N c a x (ins b v cmp)))])]))
   (blacken (ins t v cmp)))
 
 (define min
@@ -133,16 +133,16 @@
 
 (define blacken
   (match-lambda
-    [(N 'R (R! a) x b)
-     (N 'B a x b)]
-    [(N 'R a x (R! b))
-     (N 'B a x b)]
+    [(R! (R! a) x b)
+     (B! a x b)]
+    [(R! a x (R! b))
+     (B! a x b)]
     [t t]))
 
 (define redden
   (match-lambda
-    [(N 'B (B! a) x (B! b))
-     (N 'R a x b)]
+    [(B! (B! a) x (B! b))
+     (R! a x b)]
     [t t]))
 
 (define (delete t v cmp)
@@ -167,26 +167,25 @@
 (module+ test
   (define black-node?
     (match-lambda
-      [(L) #t]
-      [(N 'B _ _ _) #t]
+      [(B! _) #t]
       [_ #f]))
   
   (define local-invariant?
     (match-lambda
       [(L) #t]
-      [(N 'R a _ b)
+      [(R! a _ b)
        (and (black-node? a)
             (black-node? b)
             (local-invariant? a)
             (local-invariant? b))]
-      [(N 'B a _ b)
+      [(B! a _ b)
        (and (local-invariant? a)
             (local-invariant? b))]))
   
   (define global-invariant?
     (match-lambda
       [(L) 1]
-      [(N (? (or/c 'R 'B) c) a _ b)
+      [(N c a _ b)
        (let ([a-length (global-invariant? a)]
              [b-length (global-invariant? b)])
          (and a-length
