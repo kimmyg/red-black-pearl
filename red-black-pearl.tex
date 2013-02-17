@@ -217,6 +217,42 @@ learn the algorithm and then think about it.
 \section{Conclusion}
 It is true that genuine deletion is complex, but its complexity is fairly localized. Aside from the \texttt{delete} function proper, it requires the extension of the \texttt{Color} datatype to support two more atomic variants and a few helper functions to support color arithmetic. [It's a small price to pay.] In exchange, we receive O(log n) direct time complexity without any additional constant factor above the original implementation.
 
+The salient observation/insight of Okasaki was to temporarily infringe (word) on the local property in order to make sure the global property remained satisfied. When adding a node (which happens at the bottom of the tree), we color it red, possibly infringing on the local property but keeping the global intact. This possibly introduces a violation of the local property of one of the following forms:
+
+[picture of the four forms]
+
+Okasaki coped with this by transforming them all into this form:
+
+By pushing the red node upward, another case of this violation might be introduced, just further up the tree. The same transformation is applied as necessary perhaps even reaching the root where it also reaches resolution.
+
+We can reason about this transformation purely locally by considering the number of black nodes this portion of the tree contributes to each path that travels through it.
+
+It is easy to see that this transformation brings this part of the tree in harmony with the local condition. We can reason that it preserves the global property by considering the number of black nodes this portion of the tree contributes to each path that touches it. Each of these paths a, b, c, and d passes through the single black node atop each case. Then the product of the transformation must be correct as each path inherits/accesses/utilizes one black node [in the target].
+
+This transformation has another useful property that Okasaki didn't rely on, but one on which we will need to.
+
+A portion of a tree which looks like either of these
+
+[picture of black node with three red nodes underneath]
+
+is correctly reoriented by the transformation.
+
+The final step of Okasaki's algorithm unilaterally changes the root node to black, as it is correct to do in all cases. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the construction demands it.
+
+When inserting an element, our final step is to blacken the root, but only if necessary. Dual to this, when deleting an element, our \emph{first} step is to redden the root, but only if possible. This gives us slack if the ascending rotations happen to make it to the root. (If we are unable to redden the tree without violating the local condition, then at least on of the children must itself be red which puts a red node sufficiently close to the action.)
+
+The delete function first locates the given value in recursive fashion. If we reach a leaf node, the value was not present, and the tree is left unchanged. If it is found at the bottom and colored red, it is soundly removed. If it is colored black, we replace it with a double-black leaf. If we imagine that such a leaf counts for two black nodes, thin this action preserves the global property. Of course, the properties are simply to guarantee specific time complexities, and traversing this node costs no more than traversing any other. This node is a temporary marker to indicate the need for rotation, and will be discharged accordingly.
+
+If the value is found enough away from the fringe, we replace it with the minimum value of its right child and remove the node that contained that. This strategy is convenient for two reasons: First, it allows us to provide or leverage a \emph{min} function, which is useful when implementing priority queues. Second, it allows us to only worry about removing nodes from the bottom of the tree.
+
+We must consider the final case when the value resides in node not on the bottom of the tree, but with no right child. In this case, the global condition constrains the node to be black and its sole child to be red. To satisfy this case, we remove the black node and replace it with its child, colored black. In doing this, we face no danger in violating either constraint.
+
+In the same way that we consider leaf nodes to be black, we consider double-black leaf nodes to be double black.
+
+The presence of a double-black child node indicates the need for a rotation operation. In some cases, the rotation can discharge the double-black node, and no further rotations will be made. In others, the local structure of the tree prevents resolution in its scope, and the double-black node is pushed higher to be treated by another rotation occurring higher in the tree.
+
+We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a single-black node once at the root. This would require a minor intrusion of concerns into the \emph{blacken} function, but is fortunately unnecessary. [Recall that] the first step of the deletion algorithm is to redden the root if possible, and that, if it's not possible, the root must have a red child. This is sufficient to guarantee that a double-black node, if it reaches the top, can be discharged there by the natural flow of the algorithm; no exceptions need be made.
+
 \appendix
 \section{Appendix Title}
 
