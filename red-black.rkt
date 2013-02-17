@@ -293,16 +293,15 @@
             [n (length xs)])
         (/ (/ (* ms 1000) 100) n))))
   
-  (for ([i 12])
-    (let* ([avg (exact->inexact
+  #;(for ([i 7])
+    (let* ([avg-k (exact->inexact
                  (/ (for/sum ([j 100])
                       (let-values ([(t n) (number-tree (random-tree (+ 2 i)))])
-                        (mean-removal-time t)))
-                    100))]
-           [k (/ (/ (log avg) (log 2)) (add1 i))])
-        (printf "~a ~a ~a~n" (add1 i) avg k)))
+                        (/ (mean-removal-time t) (/ (log n) (log 2)))))
+                    100))])
+        (printf "~a ~a~n" (+ 2 i) avg-k)))
   
-  #;(for/and ([n 7])
+  (for/and ([n 7])
       (let ([k (expt 2 (* (add1 n) 2))])
         (printf "testing trees of height ~a (~a times)..." (add1 n) k)
         (displayln (for/max ([i k])
