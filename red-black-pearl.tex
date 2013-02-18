@@ -28,16 +28,16 @@
 \maketitle
 
 \begin{abstract}
-This is the text of the abstract.
+Red-black trees were born in the imperative world and only adopted into the functional. Okasaki's exposition of the simplicity of a functional implementation actually felt more like a rebirth than mere adoption. With this regime shift came a shift in focus: the energy that would otherwise have been spent on pointer manipulation is now applied to establishing correctness with formal methods--a step forward, to be sure--but one wonders if there is a simple, obviously-correct, functional delete. Indeed there is.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
 
 \terms
-term1, term2
+red-black tree, delete, data structure
 
 \keywords
-keyword1, keyword2
+red-black tree, delete, data structure
 
 \section{Introduction}
 
@@ -53,6 +53,8 @@ and the global property that
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are always colored black.} node contains the same number of black nodes.
 \end{enumerate}
 These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty for a tree search is a reasonable constant factor.
+
+\section{Insertion}
 
 Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
 
@@ -71,12 +73,13 @@ Using a bit of syntactic sugar on top of Racket, we can define the \texttt{inser
 where \texttt{balance} yet remains undefined.
 
 This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node in red, this action violates the local property. In the face of this possibility, Okasaki reasons that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of the form
-
-tree forms
-
+\begin{center}
+\includegraphics[scale=0.22]{four-cases.png}
+\end{center}
 and transforms them into
-
-single tree form
+\begin{center}
+\includegraphics[scale=0.22]{four-cases-resolved.png}
+\end{center}
 
 We can reason locally about the effect this transformation has on the global property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by ensuring that the paths that reach the subtrees $a$, $b$, $c$, and $d$ accumulate the same number of black nodes both before and after it occurs.
 
