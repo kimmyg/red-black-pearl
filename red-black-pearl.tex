@@ -206,7 +206,7 @@ balance color a x b = T color a x b
 
 Suppose the value we wish to delete happens to reside in a node at the bottom of the tree. There are two possibilites:
 
-\includegraphics[scale=0.20]{red-black-slides-008.png}
+%\includegraphics[scale=0.20]{red-black-slides-008.png}
 
 The delicate thing here is that we need to maintain the invariant that every path from the root of the tree to the bottom has the same number of black nodes. In the case that our value resides in a red node, we can intuitively see that replacing that entire subtree with a black leaf will preserve the invariant. A conceptual viewpoint that will serve us well is that the leaves donated their ``blackness'' to the parent, preserving the invariant. By applying the same idea to the second case, we must decide what happens when the ``blackness'' is propagated upward to a black node. As a conceptual convenience, we can temporarily assign the node a color of double black. This means that when counting the number of black nodes in a path which contains this node, we count this node twice. Of course, this is strictly for accounting purposes, and the node of course has the same computational cost to traverse as any other node. We will simply use this new color to account for bubbling which needs to travel up the tree.
 
