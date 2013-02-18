@@ -109,28 +109,12 @@ The final stop of Okasaki's insertion algorithm is to blacken the root of the tr
 \end{verbatim}
 with a trivial definition of \texttt{blacken}.
 
-The \texttt{insert} function recurs to locate the insertion point at the bottom of the tree.
-His salient observation was to temporarily infringe on the local invariant in order to maintain the global one: when adding a node (which happens at the bottom of the tree), we color it red, possibly infringing on the local property but keeping the global intact. This possibly introduces a violation of the local property of one of the following forms:
 
-[picture of the four forms]
+%We can reason about this transformation purely locally by considering the number of black nodes this portion of the tree contributes to each path that travels through it.
 
-Okasaki coped with this by transforming them all into this form:
+%It is easy to see that this transformation brings this part of the tree in harmony with the local condition. We can reason that it preserves the global property by considering the number of black nodes this portion of the tree contributes to each path that touches it. Each of these paths a, b, c, and d passes through the single black node atop each case. Then the product of the transformation must be correct as each path inherits/accesses/utilizes one black node [in the target].
 
-By pushing the red node upward, another case of this violation might be introduced, just further up the tree. The same transformation is applied as necessary perhaps even reaching the root where it also reaches resolution.
-
-We can reason about this transformation purely locally by considering the number of black nodes this portion of the tree contributes to each path that travels through it.
-
-It is easy to see that this transformation brings this part of the tree in harmony with the local condition. We can reason that it preserves the global property by considering the number of black nodes this portion of the tree contributes to each path that touches it. Each of these paths a, b, c, and d passes through the single black node atop each case. Then the product of the transformation must be correct as each path inherits/accesses/utilizes one black node [in the target].
-
-This transformation has another useful property that Okasaki didn't rely on, but one on which we will need to.
-
-A portion of a tree which looks like either of these
-
-[picture of black node with three red nodes underneath]
-
-is correctly reoriented by the transformation.
-
-The final step of Okasaki's algorithm unilaterally changes the root node to black, as it is correct to do in all cases. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the construction demands it.
+The final step of Okasaki's algorithm unilaterally changes the root node to black. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the construction demands it.
 
 When inserting an element, our final step is to blacken the root, but only if necessary. Dual to this, when deleting an element, our \emph{first} step is to redden the root, but only if possible. This gives us slack if the ascending rotations happen to make it to the root. (If we are unable to redden the tree without violating the local condition, then at least on of the children must itself be red which puts a red node sufficiently close to the action.)
 
