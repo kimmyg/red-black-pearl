@@ -58,7 +58,7 @@ These conditions guarantee that the longest path from root to leaf can be no mor
 
 Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
 
-Using a bit of syntactic sugar on top of Racket, we can define the \texttt{insert} function by
+Using a bit of syntactic sugar on top of Racket, we can express the \texttt{insert} function with
 \begin{verbatim}
 (define (insert t v)
   (match t
@@ -72,7 +72,7 @@ Using a bit of syntactic sugar on top of Racket, we can define the \texttt{inser
 \end{verbatim}
 where \texttt{balance} yet remains undefined.
 
-This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node in red, this action violates the local property. In the face of this possibility, Okasaki reasons that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of the form
+This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of the form
 \begin{center}
 \includegraphics[scale=0.22]{four-cases.png}
 \end{center}
@@ -81,9 +81,9 @@ and transforms them into
 \includegraphics[scale=0.22]{four-cases-resolved.png}
 \end{center}
 
-We can reason locally about the effect this transformation has on the global property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by ensuring that the paths that reach the subtrees $a$, $b$, $c$, and $d$ accumulate the same number of black nodes both before and after it occurs.
+We can reason locally about the effect this transformation has on the global property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by verifying that the paths that reach the subtrees $a$, $b$, $c$, and $d$ accumulate the same number of black nodes both before and after it occurs.
 
-The purpose of this transformation is to resolve a violation of the local property, and while it does resolve one, it potentially introduces another further up the tree. We can treat this violation the same way and even with the same function; hence, the \texttt{balance} function is applied preventively at each level of the recursion. This transformation cannot possibly introduce a violation at the root of the tree, being the child of no node, so the correctness of the entire process follows from a simple inductive argument.
+The purpose of this transformation is to resolve a violation of the local property, and while it does resolve one, it potentially introduces another further up the tree. We can treat this violation the same way and even with the same function; hence, the \texttt{balance} function is applied preventively at each level of the recursion which has the effect of working up the tree as the semantic stack unwinds. This transformation cannot possibly introduce a red-red violation at the root of the tree, being the child of no node, so the correctness of the entire process follows from a simple inductive argument.
 
 Much of the simplicity of Okasaki's explanation comes from the simplicity of going from the diagrams to
 \begin{verbatim}
@@ -117,7 +117,47 @@ with a trivial definition of \texttt{blacken}.
 
 %It is easy to see that this transformation brings this part of the tree in harmony with the local condition. We can reason that it preserves the global property by considering the number of black nodes this portion of the tree contributes to each path that touches it. Each of these paths a, b, c, and d passes through the single black node atop each case. Then the product of the transformation must be correct as each path inherits/accesses/utilizes one black node [in the target].
 
-The final step of Okasaki's algorithm unilaterally changes the root node to black. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the construction demands it.
+\section{Deletion}
+
+Deletion in binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. If it has a right subtree, replace its value with the minimum value of its right subtree and remove that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min\_element} function for free, which is critical for priority queues.} Thus, deletion is recursive.
+
+We can modify this approach to account for red-black properties and ultimately preserve them. We start by considering the configurations of a node with no right subtree.
+
+The empty tree
+\begin{center}
+\includegraphics[scale=0.22]{remove-empty.png}
+\end{center}
+remains unchanged after the removal of any element.
+
+A red node with no left or right subtree
+\begin{center}
+\includegraphics[scale=0.22]{remove-single-red.png}
+\end{center}
+becomes the empty tree.
+
+A red node with a black-rooted left subtree
+
+%graphic
+
+violates the global property and cannot occur.
+
+A black node with a red-rooted left subtree
+
+%graphic
+
+becomes the subtree itself, only black-rooted. The global invariant dictates that the left subtree is at most a single red node, but this is merely a curiosity and has no bearing on the algorithm.
+
+Finally, a black node with no left or right subtree
+\begin{center}
+\includegraphics[scale=0.22]{remove-single-black.png}
+\end{center}
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. If we were to treat this case the same as if the node were red, we would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing a new node color, double-black, and a new leaf node, the double-black leaf.
+
+For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. Of course, we cannot let such a node persist, or we'll have no hope of maintaing optimal time complexity. We can attempt to discharge it by performing a tree rotation...
+
+Much like insertion, we have to account for the possibility of a deletion operation introducing a double-black node from the start. Where the insertion operation balances the tree, attempting to resolve red-red violations, the deletion operation rotates the tree, attempting to discharge double-black nodes. Just as the insertion operation possibly passes unbalance up the tree, the deletion operation possibly passes a double-black node up the tree. Finally, both operations ``bottom out'' at the top of the tree, guaranteeing resolution.
+
+The final step of Okasaki's algorithm unilaterally changes the root node to black. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it.
 
 When inserting an element, our final step is to blacken the root, but only if necessary. Dual to this, when deleting an element, our \emph{first} step is to redden the root, but only if possible. This gives us slack if the ascending rotations happen to make it to the root. (If we are unable to redden the tree without violating the local condition, then at least on of the children must itself be red which puts a red node sufficiently close to the action.)
 
