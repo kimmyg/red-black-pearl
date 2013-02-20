@@ -253,6 +253,7 @@
         (cons (random k) (random-list (sub1 n) k))))
   
   (define (time thunk)
+    (collect-garbage)
     (let ([start (current-milliseconds)]
           [dummy (thunk)]
           [end (current-milliseconds)])
@@ -261,7 +262,7 @@
   (displayln "comparison against persistent sets")
   
   (displayln "insertion")
-  (for ([i 16])
+  (for ([i 20])
     (let* ([n (expt 2 (add1 i))]
            [xs (random-list n n)])
       (let ([set-time (time
@@ -282,7 +283,7 @@
       (insert t v cmp)))
   
   (displayln "deletion")
-  (for ([i 16])
+  (for ([i 20])
     (let* ([n (expt 2 (add1 i))]
            [xs (random-list n n)]
            [s (apply set xs)]
