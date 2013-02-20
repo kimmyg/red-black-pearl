@@ -136,8 +136,8 @@
 
 (define -B
   (match-lambda
+    [(BB a x b) (B a x b)] ; this order is important
     [(BB) (L)]
-    [(BB a x b) (B a x b)]
     [a (error '-B "unsupported node ~a" a)]))
 
 (define rotate
@@ -190,66 +190,16 @@
           [= (let ([v (min b)])
                (rotate (N c a v (del b v cmp))))]
           [> (rotate (N c a x (del b v cmp)))])]))
-    (del (redden t) v cmp))
-
-#;(define blacken
-  (match-lambda
-    [(L) (L)]
-    [(N _ a x b)
-     (N 'B a x b)]))
-
-#;(define redden
-  (match-lambda
-    [(L) (L)]
-    [(N _ a x b)
-     (N 'R a x b)]))
-
-#;(define (delete t v cmp)
-  (define (del t v cmp)
-    (match t
-      [(L)
-       (L)]
-      [(R (L) (== v) (L))
-       (L)]
-      [(R a (== v) (L))
-       a]
-      [(B (R a x b) (== v) (L))
-       (B a x b)]
-      [(R (L) (== v) a)
-       a]
-      [(B (L) (== v) (R a x b))
-       (B a x b)]
-      [(R (R a x b) (== v) (B c))
-       (R a x (del (R b v c) v cmp))]
-      [(B (R a x b) (== v) (R c y d))
-       (balance (B a x (R (R b v c) y d)))]
-      [(R (B a) (== v) (R b x c))
-       (R (del (R a v b) v cmp) x c)]
-      [(R (R a x b) (== v) (R c y d))
-       (R a x (R (del (R b v c) v cmp) y d))]
-      [(R (B a x b) (== v) (B c y d))
-       (balance (B a x (R (del (R b v c) v cmp) y d)))]
-      [(N c a x b)
-       (switch-compare
-        (cmp v x)
-        [< (balance (N c (balance (del a v cmp)) x b))]
-        [= (error 'delete "hit equals")]
-        [> (balance (N c a x (balance (del b v cmp))))])]))
-  (blacken (del (redden t) v cmp)))
+  (del (redden t) v cmp))
 
 
 (module+ test
-  (define black-node?
-    (match-lambda
-      [(B) #t]
-      [_ #f]))
-  
   (define local-invariant?
     (match-lambda
       [(L) #t]
       [(R a _ b)
-       (and (black-node? a)
-            (black-node? b)
+       (and (B? a)
+            (B? b)
             (local-invariant? a)
             (local-invariant? b))]
       [(B a _ b)
