@@ -1,8 +1,6 @@
 #lang racket/base
-(require racket/contract
-         racket/list
-         racket/match
-         racket/port)
+(require racket/list
+         racket/match)
 
 (provide empty-tree
          member?
@@ -14,6 +12,7 @@
 (struct L RB-tree () #:transparent)
 (struct L2 RB-tree () #:transparent)
 (struct N RB-tree (color left-child value right-child) #:transparent)
+
 
 (define-match-expander B
   (syntax-rules ()
@@ -136,8 +135,8 @@
 
 (define -B
   (match-lambda
-    [(BB a x b) (B a x b)] ; this order is important
-    [(BB) (L)]
+    [(L2) (L)]
+    [(BB a x b) (B a x b)]
     [a (error '-B "unsupported node ~a" a)]))
 
 (define rotate
@@ -194,6 +193,9 @@
 
 
 (module+ test
+  (require racket/port
+           racket/set)
+  
   (define local-invariant?
     (match-lambda
       [(L) #t]
@@ -245,13 +247,58 @@
                      [(r n) (number-tree r (add1 n))])
          (values (N c l v r) n))]))
   
-  (define ts
-    (list (N 'B (L) 1 (N 'R (L) 2 (L)))
-          (N 'B (L) 1 (L))
-          (N 'B (N 'R (L) 1 (L)) 2 (N 'R (L) 3 (L)))
-          (N 'R (N 'B (L) 1 (L)) 2 (N 'B (L) 3 (N 'R (L) 4 (L))))))
+  (define (random-list n k)
+    (if (zero? n)
+        empty
+        (cons (random k) (random-list (sub1 n) k))))
   
-  ;(random-numbered-tree 2)
+  (define (time thunk)
+    (let ([start (current-milliseconds)]
+          [dummy (thunk)]
+          [end (current-milliseconds)])
+      (- end start)))
+  
+  (displayln "comparison against persistent sets")
+  
+  (displayln "insertion")
+  (for ([i 16])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)])
+      (let ([set-time (time
+                       (λ ()
+                         (for/fold ([s (set)])
+                           ([x xs])
+                           (set-add s x))))]
+            [rbt-time (time
+                       (λ ()
+                         (for/fold ([t empty-tree])
+                           ([x xs])
+                           (insert t x <))))])
+        (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
+  
+  (define (insert* t cmp vs)
+    (for/fold ([t t])
+      ([v vs])
+      (insert t v cmp)))
+  
+  (displayln "deletion")
+  (for ([i 16])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)]
+           [s (apply set xs)]
+           [t (insert* empty-tree < xs)])
+      (let ([set-time (time
+                       (λ ()
+                         (for/fold ([s s])
+                           ([x xs])
+                           (set-remove s x))))]
+            [rbt-time (time
+                       (λ ()
+                         (for/fold ([t t])
+                           ([x xs])
+                           (delete t x <))))])
+        (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
+            
   
   (define (time-tree t)
     (let ([xs (members t)])
@@ -330,14 +377,15 @@
                         100))])
         (printf "~a ~a~n" (+ 2 i) avg-k)))
   
+  (displayln "testing for correctness")
   (for/and ([n 7])
     (let ([k (expt 2 (* (add1 n) 2))])
-      (printf "testing trees of height ~a (~a times)..." (add1 n) k)
-      (displayln (for/max ([i k])
-                          (let-values ([(t n) (number-tree (random-tree (add1 n)))])
-                            (test-tree t)
-                            n)))
-      (printf "done~n")))
+      (printf "testing ~a random trees of height ~a...~n" k (add1 n))
+      (printf "all passed (max size was ~a)~n"
+              (for/max ([i k])
+                       (let-values ([(t n) (number-tree (random-tree (add1 n)))])
+                         (test-tree t)
+                         n)))))
   
   #;(for ([i 10])
       (let*-values ([(t n) (number-tree (random-tree (add1 i)))]
