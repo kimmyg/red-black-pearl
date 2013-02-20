@@ -119,7 +119,11 @@ with a trivial definition of \texttt{blacken}.
 
 \section{Deletion}
 
-Deletion in binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. If it has a right subtree, replace its value with the minimum value of its right subtree and remove that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min\_element} function for free, which is critical for priority queues.} Thus, deletion is recursive.
+Maybe move.
+
+Okasaki succeeded in adding intuition to tree insertion, something generally considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake. That same attitude of intricacy and proneness to error has shifted to tree deletion. While we grant that deletion seems to be more complex than insertion, we hope to show that it is only slightly so, and provide an intuition to a method over a reference.
+
+Deletion in unrestricted binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. If it has a right subtree, replace its value with the minimum value of its right subtree and remove that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min\_element} function for free, which is critical for priority queues.} Thus, deletion is recursive.
 
 We can modify this approach to account for red-black properties and ultimately preserve them. We start by considering the configurations of a node with no right subtree.
 
