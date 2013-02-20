@@ -12,8 +12,56 @@
 
 (struct RB-tree () #:transparent)
 (struct L RB-tree () #:transparent)
-(struct BB RB-tree () #:transparent)
+(struct L2 RB-tree () #:transparent)
 (struct N RB-tree (color left-child value right-child) #:transparent)
+
+(define-match-expander B
+  (syntax-rules ()
+    [(_)       (or (L)
+                   (N 'B _ _ _))]
+    [(_ a x b) (N 'B a x b)])
+  (syntax-rules ()
+    [(_ a x b) (N 'B a x b)]))
+  
+(define-match-expander B?
+  (syntax-rules ()
+    [(_ a) (and (B) a)])
+  (syntax-rules ()
+    [(_ a) (match a
+             [(B) #t]
+             [_   #f])]))
+
+(define-match-expander R
+  (syntax-rules ()
+    [(_)       (N 'R _ _ _)]
+    [(_ a x b) (N 'R a x b)])
+  (syntax-rules ()
+    [(_ a x b) (N 'R a x b)]))
+
+(define-match-expander R?
+  (syntax-rules ()
+    [(_ a) (and (R) a)])
+  (syntax-rules ()
+    [(_ a) (match a
+             [(R) #t]
+             [_   #f])]))
+
+(define-match-expander BB
+  (syntax-rules ()
+    [(_)       (or (L2)
+                   (N 'BB _ _ _))]
+    [(_ a x b) (N 'BB a x b)])
+  (syntax-rules ()
+    [(_) (L2)]
+    [(_ a x b) (N 'BB a x b)]))
+
+(define-match-expander BB?
+  (syntax-rules ()
+    [(_ a) (and (BB) a)])
+  (syntax-rules ()
+    [(_ a) (match a
+             [(BB) #t]
+             [_    #f])]))
 
 (define empty-tree (L))
 
@@ -53,23 +101,23 @@
 
 (define balance
   (match-lambda
-    [(or (B! (R! (R! a x b) y c) z d)
-         (B! (R! a x (R! b y c)) z d)
-         (B! a x (R! (R! b y c) z d))
-         (B! a x (R! b y (R! c z d))))
-     (R! (B! a x b) y (B! c z d))]
-    [(or (BB! (R! (R! a x b) y c) z d)
-         (BB! (R! a x (R! b y c)) z d)
-         (BB! a x (R! (R! b y c) z d))
-         (BB! a x (R! b y (R! c z d))))
-     (N 'B (B! a x b) y (B! c z d))]
+    [(or (B (R (R a x b) y c) z d)
+         (B (R a x (R b y c)) z d)
+         (B a x (R (R b y c) z d))
+         (B a x (R b y (R c z d))))
+     (R (B a x b) y (B c z d))]
+    [(or (BB (R (R a x b) y c) z d)
+         (BB (R a x (R b y c)) z d)
+         (BB a x (R (R b y c) z d))
+         (BB a x (R b y (R c z d))))
+     (B (B a x b) y (B c z d))]
     [t t]))
 
 (define (insert t v cmp)
   (define (ins t v cmp)
     (match t
       [(L)
-       (R! (L) v (L))]
+       (R (L) v (L))]
       [(N c a x b)
        (switch-compare
         (cmp v x)
@@ -84,78 +132,57 @@
     [(N _ (L) x _) x]
     [(N _ a _ _) (min a)]))
 
-(define-match-expander BB!
-  (syntax-rules ()
-    [(_ a) (or (and (BB) a)
-               (and (N 'BB _ _ _) a))]
-    [(_ a x b) (N 'BB a x b)])
-  (syntax-rules ()
-    [(_ a x b) (N 'BB a x b)]))
 
-(define-match-expander B!
-  (syntax-rules ()
-    [(_ a) (or (and (L) a)
-               (and (N 'B _ _ _) a))]
-    [(_ a x b) (N 'B a x b)])
-  (syntax-rules ()
-    [(_ a x b) (N 'B a x b)]))
-
-(define-match-expander R!
-  (syntax-rules ()
-    [(_ a) (and (N 'R _ _ _) a)]
-    [(_ a x b) (N 'R a x b)])
-  (syntax-rules ()
-    [(_ a x b) (N 'R a x b)]))
 
 (define -B
   (match-lambda
     [(BB) (L)]
-    [(BB! a x b) (B! a x b)]
+    [(BB a x b) (B a x b)]
     [a (error '-B "unsupported node ~a" a)]))
 
 (define rotate
   (match-lambda
-    [(R! (BB! a) x (B! b y c))
-     (balance (B! (R! (-B a) x b) y c))]
-    [(R! (B! a x b) y (BB! c))
-     (balance (B! a x (R! b y (-B c))))]
+    [(R (BB? a) x (B b y c))
+     (balance (B (R (-B a) x b) y c))]
+    [(R (B a x b) y (BB? c))
+     (balance (B a x (R b y (-B c))))]
     
-    [(B! (BB! a) x (B! b y c))
-     (balance (BB! (R! (-B a) x b) y c))]
-    [(B! (B! a x b) y (BB! c))
-     (balance (BB! a x (R! b y (-B c))))]
+    [(B (BB? a) x (B b y c))
+     (balance (BB (R (-B a) x b) y c))]
+    [(B (B a x b) y (BB? c))
+     (balance (BB a x (R b y (-B c))))]
     
-    [(B! (BB! a) x (R! (B! b y c) z (B! d)))
-     (B! (balance (B! (R! (-B a) x b) y c)) z d)]
-    [(B! (R! (B! a) x (B! b y c)) z (BB! d))
-     (B! a x (balance (B! b y (R! c z (-B d)))))]
+    [(B (BB? a) x (R (B b y c) z (B? d)))
+     (B (balance (B (R (-B a) x b) y c)) z d)]
+    [(B (R (B? a) x (B b y c)) z (BB? d))
+     (B a x (balance (B b y (R c z (-B d)))))]
     
     [t t]))
 
 (define blacken
     (match-lambda
-      [(R! (R! a) x b)
-       (B! a x b)]
-      [(R! a x (R! b))
-       (B! a x b)]
+      [(R (R? a) x b)
+       (B a x b)]
+      [(R a x (R? b))
+       (B a x b)]
       [t t]))
 
 (define redden
     (match-lambda
-      [(B! (B! a) x (B! b))
-       (R! a x b)]
+      [(B (B? a) x (B? b))
+       (R a x b)]
       [t t]))
 
 (define (delete t v cmp)
     (define (del t v cmp)
       (match t
         [(L) (L)]
-        [(R! (L) (== v) (L))
+        [(R (L) (== v) (L))
          (L)]
-        [(B! (L) (== v) (L))
+        [(B (L) (== v) (L))
          (BB)]
-        [(B! (R! a x b) (== v) (L))
-         (B! a x b)]
+        [(B (R a x b) (== v) (L))
+         (B a x b)]
         [(N c a x b)
          (switch-compare
           (cmp v x)
@@ -182,26 +209,26 @@
     (match t
       [(L)
        (L)]
-      [(R! (L) (== v) (L))
+      [(R (L) (== v) (L))
        (L)]
-      [(R! a (== v) (L))
+      [(R a (== v) (L))
        a]
-      [(B! (R! a x b) (== v) (L))
-       (B! a x b)]
-      [(R! (L) (== v) a)
+      [(B (R a x b) (== v) (L))
+       (B a x b)]
+      [(R (L) (== v) a)
        a]
-      [(B! (L) (== v) (R! a x b))
-       (B! a x b)]
-      [(R! (R! a x b) (== v) (B! c))
-       (R! a x (del (R! b v c) v cmp))]
-      [(B! (R! a x b) (== v) (R! c y d))
-       (balance (B! a x (R! (R! b v c) y d)))]
-      [(R! (B! a) (== v) (R! b x c))
-       (R! (del (R! a v b) v cmp) x c)]
-      [(R! (R! a x b) (== v) (R! c y d))
-       (R! a x (R! (del (R! b v c) v cmp) y d))]
-      [(R! (B! a x b) (== v) (B! c y d))
-       (balance (B! a x (R! (del (R! b v c) v cmp) y d)))]
+      [(B (L) (== v) (R a x b))
+       (B a x b)]
+      [(R (R a x b) (== v) (B c))
+       (R a x (del (R b v c) v cmp))]
+      [(B (R a x b) (== v) (R c y d))
+       (balance (B a x (R (R b v c) y d)))]
+      [(R (B a) (== v) (R b x c))
+       (R (del (R a v b) v cmp) x c)]
+      [(R (R a x b) (== v) (R c y d))
+       (R a x (R (del (R b v c) v cmp) y d))]
+      [(R (B a x b) (== v) (B c y d))
+       (balance (B a x (R (del (R b v c) v cmp) y d)))]
       [(N c a x b)
        (switch-compare
         (cmp v x)
@@ -214,18 +241,18 @@
 (module+ test
   (define black-node?
     (match-lambda
-      [(B! _) #t]
+      [(B) #t]
       [_ #f]))
   
   (define local-invariant?
     (match-lambda
       [(L) #t]
-      [(R! a _ b)
+      [(R a _ b)
        (and (black-node? a)
             (black-node? b)
             (local-invariant? a)
             (local-invariant? b))]
-      [(B! a _ b)
+      [(B a _ b)
        (and (local-invariant? a)
             (local-invariant? b))]))
   
