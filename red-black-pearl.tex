@@ -41,7 +41,7 @@ red-black tree, delete, data structure
 
 \section{Introduction}
 
-When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced tree--are a natural choice. Common set operations, such as membership testing and persistent addition map naturally to the native operations of the backing store. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, red-black trees are efficient, persistent, and still leave us wanting.
+When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary search tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, red-black trees are efficient, persistent, and still leave us wanting.
 
 To see why, let's briefly review what makes red-black trees so special. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the local property that
 \begin{enumerate}
@@ -81,7 +81,9 @@ and transforms them into
 \includegraphics[scale=0.22]{four-cases-resolved.png}
 \end{center}
 
-We can reason locally about the effect this transformation has on the global property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by verifying that the paths that reach the subtrees $a$, $b$, $c$, and $d$ accumulate the same number of black nodes both before and after it occurs.
+We can reason about the effect this transformation has on the local property by considering the possible colorings of the root of each subtree $a$, $b$, $c$, and $d$. If the parent of this node is red, this node must be black and there are no restrictions on its placement in the reconstruction. If the parent is black, this node is possibly red, and the assignment of a red parent possibly introduces a red-red violation. The \texttt{balance} function is designed to resolve precisely this situation. We can verify this transformation preserves the global property by verifying that any possible introduction of this violation is subjected to \texttt{balance}.
+
+Furthermore, we can reason locally about the effect this transformation has on the \emph{global} property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by verifying that the paths that reach the subtrees $a-d$ accumulate the same number of black nodes both before and after it occurs.
 
 The purpose of this transformation is to resolve a violation of the local property, and while it does resolve one, it potentially introduces another further up the tree. We can treat this violation the same way and even with the same function; hence, the \texttt{balance} function is applied preventively at each level of the recursion which has the effect of working up the tree as the semantic stack unwinds. This transformation cannot possibly introduce a red-red violation at the root of the tree, being the child of no node, so the correctness of the entire process follows from a simple inductive argument.
 
