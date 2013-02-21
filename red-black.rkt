@@ -131,7 +131,17 @@
     [(N _ (L) x _) x]
     [(N _ a _ _) (min a)]))
 
+(define min-del
+  (match-lambda
+    [(L) (error 'min-del "empty tree")]
+    [(R (L) x (L)) (values x (L))]
+    [(B (L) x (L)) (values x (L2))]
+    [(B (L) x (R a y b)) (values x (B a y b))]
+    [(N c a x b) (let-values ([(v a) (min-del a)])
+                   (values v (rotate (N c a x b))))]))
 
+(define (min/delete t)
+  (min-del (redden t)))
 
 (define -B
   (match-lambda
@@ -172,7 +182,26 @@
        (R a x b)]
       [t t]))
 
-(define (delete t v cmp)
+(define (delete1 t v cmp)
+    (define (del t v cmp)
+      (match t
+        [(L) (L)]
+        [(R (L) (== v) (L))
+         (L)]
+        [(B (L) (== v) (L))
+         (BB)]
+        [(B (R a x b) (== v) (L))
+         (B a x b)]
+        [(N c a x b)
+         (switch-compare
+          (cmp v x)
+          [< (rotate (N c (del a v cmp) x b))]
+          [= (let-values ([(v b) (min-del b)])
+               (rotate (N c a v b)))]
+          [> (rotate (N c a x (del b v cmp)))])]))
+  (del (redden t) v cmp))
+
+(define (delete2 t v cmp)
     (define (del t v cmp)
       (match t
         [(L) (L)]
@@ -191,6 +220,7 @@
           [> (rotate (N c a x (del b v cmp)))])]))
   (del (redden t) v cmp))
 
+(define delete delete2)
 
 (module+ test
   (require racket/port
@@ -259,6 +289,30 @@
           [end (current-milliseconds)])
       (- end start)))
   
+  (define (insert* t cmp vs)
+    (for/fold ([t t])
+      ([v vs])
+      (insert t v cmp)))
+  
+  (displayln "comparing two implementations of delete")
+  
+  (displayln "deletion")
+  (for ([i 20])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)]
+           [t (insert* empty-tree < xs)])
+      (let ([imp1-time (time
+                       (λ ()
+                         (for/fold ([t t])
+                           ([x xs])
+                           (delete1 t x <))))]
+            [imp2-time (time
+                       (λ ()
+                         (for/fold ([t t])
+                           ([x xs])
+                           (delete2 t x <))))])
+        (printf "size ~a, imp1 ~ams, imp2 ~ams~n" n imp1-time imp2-time))))
+  
   (displayln "comparison against persistent sets")
   
   (displayln "insertion")
@@ -276,11 +330,6 @@
                            ([x xs])
                            (insert t x <))))])
         (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
-  
-  (define (insert* t cmp vs)
-    (for/fold ([t t])
-      ([v vs])
-      (insert t v cmp)))
   
   (displayln "deletion")
   (for ([i 20])
@@ -383,10 +432,10 @@
     (let ([k (expt 2 (* (add1 n) 2))])
       (printf "testing ~a random trees of height ~a...~n" k (add1 n))
       (printf "all passed (max size was ~a)~n"
-              (for/max ([i k])
-                       (let-values ([(t n) (number-tree (random-tree (add1 n)))])
-                         (test-tree t)
-                         n)))))
+              (sub1 (for/max ([i k])
+                             (let-values ([(t n) (number-tree (random-tree (add1 n)))])
+                               (test-tree t)
+                               n))))))
   
   #;(for ([i 10])
       (let*-values ([(t n) (number-tree (random-tree (add1 i)))]
