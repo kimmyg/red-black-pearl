@@ -131,31 +131,31 @@ We can modify this approach to account for red-black properties and ultimately p
 
 The empty tree
 \begin{center}
-\includegraphics[scale=0.22]{remove-empty.png}
+\includegraphics{empty.pdf}
 \end{center}
 remains unchanged after the removal of any element.
 
 A red node with no left or right subtree
 \begin{center}
-\includegraphics[scale=0.22]{remove-single-red.png}
+\includegraphics{single-red.pdf}
 \end{center}
 becomes the empty tree.
 
 A red node with a black-rooted left subtree
-
-%graphic
-
+\begin{center}
+\includegraphics{red-black-left-subtree.pdf}
+\end{center}
 violates the global property and cannot occur.
 
 A black node with a red-rooted left subtree
-
-%graphic
-
-becomes the subtree itself, only black-rooted. The global invariant dictates that the left subtree is at most a single red node, but this is merely a curiosity and has no bearing on the algorithm.
+\begin{center}
+\includegraphics{black-red-left-subtree.pdf}
+\end{center}
+becomes the subtree itself, only black-rooted. The global invariant dictates that the left subtree is at most a single red node, so there is no chance that this introduces a violation.
 
 Finally, a black node with no left or right subtree
 \begin{center}
-\includegraphics[scale=0.22]{remove-single-black.png}
+\includegraphics{single-black.pdf}
 \end{center}
 presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. If we were to treat this case the same as if the node were red, we would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing a new node color, double-black, and a new leaf node, the double-black leaf.
 
