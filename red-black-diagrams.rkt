@@ -168,19 +168,28 @@
     (send ctx end-page)
     (send ctx end-doc)))
 
-(render-tree '(
+(render-tree '(L)
+             "empty")
 
-(render-tree '(R (BB (label "a") "x" (label "b")) "y" (B (label "c") "z" (label "d")))
+(render-tree '(R (L) "x" (L))
+             "single-red")
+
+(render-tree '(R (B (label "a") "x" (label "b")) "y" (L))
+             "red-black-left-subtree")
+
+(render-tree '(B (R (label "a") "x" (label "b")) "y" (L))
+             "red-black-left-subtree")
+
+#;(render-tree '(R (BB (label "a") "x" (label "b")) "y" (B (label "c") "z" (label "d")))
              "red-top-before")
 
-(render-tree '(B (R (B (label "a") "x" (label "b")) "y" (label "c")) "z" (label "d"))
+#;(render-tree '(B (R (B (label "a") "x" (label "b")) "y" (label "c")) "z" (label "d"))
              "red-top-after")
 
-(render-tree '(B (BB (label "a") "v" (label "b"))
+#;(render-tree '(B (BB (label "a") "v" (label "b"))
                  "w"
                  (R (B (label "c") "x" (label "d"))
                     "y"
                     (B (label "e") "z" (label "f"))))
              "black-top-red-sibling-before")
-(render-tree '(L) "leaf")
 
