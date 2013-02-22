@@ -74,11 +74,11 @@ where \texttt{balance} yet remains undefined.
 
 This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of the form
 \begin{center}
-\includegraphics[scale=0.22]{four-cases.png}
+\includegraphics{four-cases.pdf}
 \end{center}
 and transforms them into
 \begin{center}
-\includegraphics[scale=0.22]{four-cases-resolved.png}
+\includegraphics{four-cases-resolved.pdf}
 \end{center}
 
 We can reason about the effect this transformation has on the local property by considering the possible colorings of the root of each subtree $a$, $b$, $c$, and $d$. If the parent of this node is red, this node must be black and there are no restrictions on its placement in the reconstruction. If the parent is black, this node is possibly red, and the assignment of a red parent possibly introduces a red-red violation. The \texttt{balance} function is designed to resolve precisely this situation. We can verify this transformation preserves the global property by verifying that any possible introduction of this violation is subjected to \texttt{balance}.
@@ -129,37 +129,41 @@ Deletion in unrestricted binary search trees is fairly straightforward. First, l
 
 We can modify this approach to account for red-black properties and ultimately preserve them. We start by considering the configurations of a node with no right subtree.
 
-The empty tree
+The empty tree remains unchanged after the removal of any element.
 \begin{center}
 \includegraphics{empty.pdf}
 \end{center}
-remains unchanged after the removal of any element.
 
-A red node with no left or right subtree
+A red node with no left or right subtree becomes the empty tree.
 \begin{center}
 \includegraphics{single-red.pdf}
 \end{center}
-becomes the empty tree.
 
-A red node with a black-rooted left subtree
+A red node with a black-rooted left subtree violates the global property and cannot occur.
 \begin{center}
 \includegraphics{red-black-left-subtree.pdf}
 \end{center}
-violates the global property and cannot occur.
 
-A black node with a red-rooted left subtree
+A black node with a red-rooted left subtree becomes the subtree itself, only black-rooted.
 \begin{center}
 \includegraphics{black-red-left-subtree.pdf}
 \end{center}
-becomes the subtree itself, only black-rooted. The global invariant dictates that the left subtree is at most a single red node, so there is no chance that this introduces a violation.
+The global invariant dictates that the left subtree is at most a single red node, so there is no chance that this introduces a violation.
 
-Finally, a black node with no left or right subtree
+Finally, a black node with no left or right subtree presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. If we were to treat this case the same as if the node were red, we would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color of which both branches
+\begin{center}
+\includegraphics{double-black-tree.pdf}
+\end{center}
+and leaves
+\begin{center}
+\includegraphics{double-black-leaf.pdf}
+\end{center}
+can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion. 
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. If we were to treat this case the same as if the node were red, we would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing a new node color, double-black, and a new leaf node, the double-black leaf.
 
-For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. Of course, we cannot let such a node persist, or we'll have no hope of maintaing optimal time complexity. We can attempt to discharge it by performing a tree rotation...
+%Of course, we cannot let such a node persist, or we'll have no hope of maintaing optimal time complexity. We can attempt to discharge it by performing a tree rotation...
 
 Much like insertion, we have to account for the possibility of a deletion operation introducing a double-black node from the start. Where the insertion operation balances the tree, attempting to resolve red-red violations, the deletion operation rotates the tree, attempting to discharge double-black nodes. Just as the insertion operation possibly passes unbalance up the tree, the deletion operation possibly passes a double-black node up the tree. Finally, both operations ``bottom out'' at the top of the tree, guaranteeing resolution.
 

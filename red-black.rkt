@@ -481,9 +481,11 @@
       [(right-arrow _ bhw _ e)
        (* 2 (+ bhw e))]))
   
+  (define outline-color "black")
+  (define outline-width 2)
+  
   (define (render r name)
     (define inset 8)
-    (define outline-width 2)
     (define (render-inner r ctx)
       (match r
         [(tree t)
@@ -525,7 +527,6 @@
                     [output (format "~a.pdf" name)])])
       (send ctx start-doc (symbol->string (gensym 'doc)))
       (send ctx start-page)
-      (send ctx set-pen "black" outline-width 'solid)
       (send ctx set-text-mode 'transparent)
       (send ctx translate inset inset)
       (render-inner r ctx)
@@ -585,6 +586,7 @@
         (let ([fill-color (fill-color c)]
               [text-color (text-color c)]
               [text (format "~a" v)])
+          (send ctx set-pen outline-color outline-width 'solid)
           (send ctx set-brush fill-color 'solid)
           (send ctx draw-ellipse (- (/ node-width 2)) (- (/ node-height 2)) node-width node-height)
           (let-values ([(width height descender-height extra) (send ctx get-text-extent text)])
@@ -594,19 +596,16 @@
       (let ([fill-color (fill-color (match l
                                       [(L)  'B]
                                       [(L2) 'BB]))])
+        (send ctx set-pen outline-color outline-width 'solid)
         (send ctx set-brush fill-color 'solid)
         (send ctx draw-ellipse (- (/ leaf-width 2)) (- (/ leaf-height 2)) leaf-width leaf-height)))
     (define (render-label l ctx)
-      (let ([pen (send ctx get-pen)]
-            [brush (send ctx get-brush)])
-        (send ctx set-pen "white" 1 'solid)
-        (send ctx set-brush "white" 'solid)
-        (send ctx draw-ellipse (- (/ leaf-width 2)) (- (/ leaf-height 2)) leaf-width leaf-height)
-        (let-values ([(width height descender-height extra) (send ctx get-text-extent l)])
-          (send ctx set-text-foreground "black")
-          (send ctx draw-text l (- (/ width 2)) (- (/ (- height descender-height) 2))))
-        (send ctx set-pen pen)
-        (send ctx set-brush brush)))
+      (send ctx set-pen "white" 0 'transparent)
+      (send ctx set-brush "white" 'solid)
+      (send ctx draw-ellipse (- (/ leaf-width 2)) (- (/ leaf-height 2)) leaf-width leaf-height)
+      (let-values ([(width height descender-height extra) (send ctx get-text-extent l)])
+        (send ctx set-text-foreground "black")
+        (send ctx draw-text l (- (/ width 2)) (- (/ (- height descender-height) 2)))))
     (define (render-tree-inner t ctx)
       (match t
         [(or (L) (L2))
@@ -616,18 +615,22 @@
         [(or (B  a x b)
              (R  a x b)
              (BB a x b))
-         (let ([dx (dx a)]
-               [dy (dy a)])
-           (send ctx draw-line 0 0 (- dx) dy)
-           (send ctx translate (- dx) dy)
-           (render-tree-inner a ctx)
-           (send ctx translate dx (- dy)))
-         (let ([dx (dx b)]
-               [dy (dy b)])
-           (send ctx draw-line 0 0 dx dy)
-           (send ctx translate dx dy)
-           (render-tree-inner b ctx)
-           (send ctx translate (- dx) (- dy)))
+         (when a
+           (let ([dx (dx a)]
+                 [dy (dy a)])
+             (send ctx set-pen outline-color outline-width 'solid)
+             (send ctx draw-line 0 0 (- dx) dy)
+             (send ctx translate (- dx) dy)
+             (render-tree-inner a ctx)
+             (send ctx translate dx (- dy))))
+         (when b
+           (let ([dx (dx b)]
+                 [dy (dy b)])
+             (send ctx set-pen outline-color outline-width 'solid)
+             (send ctx draw-line 0 0 dx dy)
+             (send ctx translate dx dy)
+             (render-tree-inner b ctx)
+             (send ctx translate (- dx) (- dy))))
          (render-node t ctx)]))
     (let ([x-offset (width-tree-left t)]
           [y-offset (height-tree-top t)])
@@ -645,11 +648,11 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(or (B  a x b)
-           (R  a x b)
-           (BB a x b))
+      [(or (B  a _ _)
+           (R  a _ _)
+           (BB a _ _))
        (max (/ node-width 2)
-            (+ (width-tree-left a) (dx a)))]
+            (or (and a (+ (width-tree-left a) (dx a))) 0))]
       [t (displayln t)]))
   
   (define width-tree-right
@@ -658,11 +661,11 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(or (B  a _ b)
-           (R  a _ b)
-           (BB a _ b))
+      [(or (B  _ _ b)
+           (R  _ _ b)
+           (BB _ _ b))
        (max (/ node-width 2)
-            (+ (dx b) (width-tree-right b)))]))
+            (or (and b (+ (dx b) (width-tree-right b))) 0))]))
   
   (define (width-tree t)
     (+ (width-tree-left t)
@@ -688,9 +691,9 @@
       [(or (B  a _ b)
            (R  a _ b)
            (BB a _ b))
-       (max (+ (dy a) (height-tree-bottom a))
+       (max (or (and a (+ (dy a) (height-tree-bottom a))) 0)
             (/ node-height 2)
-            (+ (dy b) (height-tree-bottom b)))]))
+            (or (and b (+ (dy b) (height-tree-bottom b))) 0))]))
   
   (define (height-tree t)
     (+ (height-tree-top t)
@@ -698,20 +701,40 @@
   
   (define arrow (right-arrow 32 4 16 4))
   
-  (render (hc-append 16 (list (tree (L))
-                              arrow
-                              (tree (L))))
-          "empty")
-  (render (hc-append 16 (list (tree (R (L) "x" (L)))
-                              arrow
-                              (tree (L))))
-          "single-red")
-  (render (tree (R (B "a" "x" "b") "y" (L))) "red-black-left-subtree")
-  (render (tree (B (R "a" "x" "b") "y" (L))) "black-red-left-subtree")
-  (render (tree (B (L) "x" (L))) "single-black")
   (render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
                               (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
                               (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
                               (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
           "four-cases")
-  (render (right-arrow 32 4 16 4) "test-arrow"))
+  
+  (render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
+          "four-cases-resolved")
+  
+  (render (hc-append 16 (list (tree (L))
+                              arrow
+                              (tree (L))))
+          "empty")
+  
+  (render (hc-append 16 (list (tree (R (L) "x" (L)))
+                              arrow
+                              (tree (L))))
+          "single-red")
+  
+  (render (tree (R (B "a" "x" "b") "y" (L)))
+          "red-black-left-subtree")
+  
+  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "y" (L)))
+                              arrow
+                              (tree (B "a" "x" "b"))))
+          "black-red-left-subtree")
+  
+  (render (tree (BB "a" "x" "b"))
+          "double-black-tree")
+  
+  (render (tree (L2))
+          "double-black-leaf")
+  
+  (render (hc-append 16 (list (tree (B (L) "x" (L)))
+                              arrow
+                              (tree (L2))))
+          "single-black"))
