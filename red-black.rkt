@@ -522,8 +522,8 @@
            (send ctx draw-path outline))]))
     (let ([ctx (new pdf-dc%
                     [interactive #f]
-                    [width (+ inset (width r) inset)]
-                    [height (+ inset (height r) inset)]
+                    [width (floor (* 0.8 (+ inset (width r) inset)))]
+                    [height (floor (* 0.8 (+ inset (height r) inset)))]
                     [output (format "~a.pdf" name)])])
       (send ctx start-doc (symbol->string (gensym 'doc)))
       (send ctx start-page)
@@ -538,6 +538,8 @@
   (define unit/4 (/ unit 4))
   (define unit/8 (/ unit 8))
   
+  (define longer (make-parameter #f))
+  
   (define dx
     (match-lambda
       [(or (L) (L2))
@@ -547,7 +549,9 @@
       [(or (B  _ _ _)
            (R  _ _ _)
            (BB _ _ _))
-       (* 5/8 unit)]))
+       (if (longer)
+           (* 7/8 unit)
+           (* 5/8 unit))]))
   
   (define dy
     (match-lambda
@@ -558,7 +562,9 @@
       [(or (B  _ _ _)
            (R  _ _ _)
            (BB _ _ _))
-       (* 5/4 unit)]))
+       (if (longer)
+           (* 7/4 unit)
+           (* 5/4 unit))]))
   
   (define label-h/2 unit/8)
   (define leaf-h/2 unit/8)
@@ -585,7 +591,9 @@
             [v (N-value n)])
         (let ([fill-color (fill-color c)]
               [text-color (text-color c)]
-              [text (format "~a" v)])
+              [text (format "~a" (match v
+                                   [(cons _ v) v]
+                                   [_ v]))])
           (send ctx set-pen outline-color outline-width 'solid)
           (send ctx set-brush fill-color 'solid)
           (send ctx draw-ellipse (- (/ node-width 2)) (- (/ node-height 2)) node-width node-height)
@@ -615,22 +623,26 @@
         [(or (B  a x b)
              (R  a x b)
              (BB a x b))
-         (when a
-           (let ([dx (dx a)]
-                 [dy (dy a)])
-             (send ctx set-pen outline-color outline-width 'solid)
-             (send ctx draw-line 0 0 (- dx) dy)
-             (send ctx translate (- dx) dy)
-             (render-tree-inner a ctx)
-             (send ctx translate dx (- dy))))
-         (when b
-           (let ([dx (dx b)]
-                 [dy (dy b)])
-             (send ctx set-pen outline-color outline-width 'solid)
-             (send ctx draw-line 0 0 dx dy)
-             (send ctx translate dx dy)
-             (render-tree-inner b ctx)
-             (send ctx translate (- dx) (- dy))))
+         (parameterize ([longer (match x
+                                  [(cons _ _) #t]
+                                  [_          #f])])
+           (when a
+             
+             (let ([dx (dx a)]
+                   [dy (dy a)])
+               (send ctx set-pen outline-color outline-width 'solid)
+               (send ctx draw-line 0 0 (- dx) dy)
+               (send ctx translate (- dx) dy)
+               (render-tree-inner a ctx)
+               (send ctx translate dx (- dy))))
+           (when b
+             (let ([dx (dx b)]
+                   [dy (dy b)])
+               (send ctx set-pen outline-color outline-width 'solid)
+               (send ctx draw-line 0 0 dx dy)
+               (send ctx translate dx dy)
+               (render-tree-inner b ctx)
+               (send ctx translate (- dx) (- dy)))))
          (render-node t ctx)]))
     (let ([x-offset (width-tree-left t)]
           [y-offset (height-tree-top t)])
@@ -699,7 +711,7 @@
     (+ (height-tree-top t)
        (height-tree-bottom t)))
   
-  (define arrow (right-arrow 32 4 16 4))
+  (define arrow (right-arrow 32 2 16 3))
   
   (render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
                               (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
@@ -737,4 +749,19 @@
   (render (hc-append 16 (list (tree (B (L) "x" (L)))
                               arrow
                               (tree (L2))))
-          "single-black"))
+          "single-black")
+  
+  (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
+                              arrow
+                              (tree (B (R (B "a" "x" "b") "y" "c") "z" "d"))))
+          "BB-R-B")
+  
+  (render (hc-append 16 (list (tree (B (BB "a" "x" "b") "y" (B "c" "z" "d")))
+                              arrow
+                              (tree (BB (R (B "a" "x" "b") "y" "c") "z" "d"))))
+          "BB-B-B")
+  
+  (render (hc-append 16 (list (tree (B (BB "a" "v" "b") "w" (R (B "c" "x" "d") (cons #t "y") (B "e" "z" "f"))))
+                              arrow
+                              (tree (B (B (R (B "a" "v" "b") "w" "c") "x" "d") "y" (B "e" "z" "f")))))
+          "BB-B-R"))

@@ -72,7 +72,7 @@ Using a bit of syntactic sugar on top of Racket, we can express the \texttt{inse
 \end{verbatim}
 where \texttt{balance} yet remains undefined.
 
-This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of the form
+This definition of \texttt{insert} unilaterally colors each newly-added node red. If the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is done by the \texttt{balance} function which takes trees of one of the following four forms
 \begin{center}
 \includegraphics{four-cases.pdf}
 \end{center}
@@ -81,6 +81,7 @@ and transforms them into
 \includegraphics{four-cases-resolved.pdf}
 \end{center}
 
+We can verify that this transformation indeed resolves red-red violations by observing that the subtrees $a$, $b$, $c$, ande $d$ are compatible with their newly-assigned parents, no matter the colorings of their roots. However, consider the parent of each of the four cases. If the parent is red, then this transformation \emph{introduces} exactly the same kind of red-red violation it resolved!, 
 We can reason about the effect this transformation has on the local property by considering the possible colorings of the root of each subtree $a$, $b$, $c$, and $d$. If the parent of this node is red, this node must be black and there are no restrictions on its placement in the reconstruction. If the parent is black, this node is possibly red, and the assignment of a red parent possibly introduces a red-red violation. The \texttt{balance} function is designed to resolve precisely this situation. We can verify this transformation preserves the global property by verifying that any possible introduction of this violation is subjected to \texttt{balance}.
 
 Furthermore, we can reason locally about the effect this transformation has on the \emph{global} property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by verifying that the paths that reach the subtrees $a-d$ accumulate the same number of black nodes both before and after it occurs.
@@ -139,10 +140,11 @@ A red node with no left or right subtree becomes the empty tree.
 \includegraphics{single-red.pdf}
 \end{center}
 
-A red node with a black-rooted left subtree violates the global property and cannot occur.
+A red node with a black-rooted left subtree
 \begin{center}
 \includegraphics{red-black-left-subtree.pdf}
 \end{center}
+violates the global property and cannot occur.
 
 A black node with a red-rooted left subtree becomes the subtree itself, only black-rooted.
 \begin{center}
