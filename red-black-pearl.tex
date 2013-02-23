@@ -189,6 +189,102 @@ In doing so, he overcame one deficiency and exposed another: the delete operatio
 
 Suppose we have a basic implementation of a red-black tree in a language that supports variants and pattern matching. Following Okasaki \cite{okasaki1999functional}, such an implementation might look like this:
 
+\begin{center}
+\includegraphics{BB-R-B.pdf}
+\end{center}
+\begin{center}
+\includegraphics{BB-B-B.pdf}
+\end{center}
+\begin{center}
+\includegraphics{four-cases-extended.pdf}
+\end{center}
+\begin{center}
+\includegraphics{four-cases-extended-resolved.pdf}
+\end{center}
+\begin{center}
+\includegraphics{BB-B-R.pdf}
+\end{center}
+\begin{verbatim}
+(define/match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))]
+  [(or (BB (R (R a x b) y c) z d)
+       (BB (R a x (R b y c)) z d)
+       (BB a x (R (R b y c) z d))
+       (BB a x (R b y (R c z d))))
+   (B (B a x b) y (B c z d))]
+  [t t])
+\end{verbatim}
+
+\begin{verbatim}
+(define min
+  (match-lambda
+    [(L) (error 'min "empty tree")]
+    [(N _ (L) x _) x]
+    [(N _ a _ _) (min a)]))
+
+(define -B
+  (match-lambda
+    [(L2) (L)]
+    [(BB a x b) (B a x b)]
+    [a (error '-B "unsupported node ~a" a)]))
+
+(define rotate
+  (match-lambda
+    [(R (BB? a) x (B b y c))
+     (balance (B (R (-B a) x b) y c))]
+    [(R (B a x b) y (BB? c))
+     (balance (B a x (R b y (-B c))))]
+    
+    [(B (BB? a) x (B b y c))
+     (balance (BB (R (-B a) x b) y c))]
+    [(B (B a x b) y (BB? c))
+     (balance (BB a x (R b y (-B c))))]
+    
+    [(B (BB? a) x (R (B b y c) z (B? d)))
+     (B (balance (B (R (-B a) x b) y c)) z d)]
+    [(B (R (B? a) x (B b y c)) z (BB? d))
+     (B a x (balance (B b y (R c z (-B d)))))]
+    
+    [t t]))
+
+(define blacken
+  (match-lambda
+    [(R (R? a) x b)
+     (B a x b)]
+    [(R a x (R? b))
+     (B a x b)]
+    [t t]))
+
+(define redden
+  (match-lambda
+    [(B (B? a) x (B? b))
+     (R a x b)]
+    [t t]))
+
+(define (delete t v cmp)
+  (define (del t v cmp)
+    (match t
+      [(L) (L)]
+      [(R (L) (== v) (L))
+       (L)]
+      [(B (L) (== v) (L))
+       (BB)]
+      [(B (R a x b) (== v) (L))
+       (B a x b)]
+      [(N c a x b)
+       (switch-compare
+        (cmp v x)
+        [< (rotate (N c (del a v cmp) x b))]
+        [= (let ([v (min b)])
+             (rotate (N c a v (del b v cmp))))]
+        [> (rotate (N c a x (del b v cmp)))])]))
+  (del (redden t) v cmp))
+\end{verbatim}
+
 \begin{verbatim}
 data Color = R | B
 data Tree a = E | T Color (Tree a) a (Tree a)
