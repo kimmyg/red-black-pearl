@@ -1,6 +1,54 @@
 #lang racket
 (require racket/draw)
 
+(struct renderable () #:transparent)
+(struct tree renderable (tree) #:transparent)
+(struct hc-append renderable (renderables) #:transparent)
+
+(define width
+  (match-lambda
+    [(tree t)
+     (width-tree t)]
+    [(hc-append rs)
+     (apply + (map width rs))]))
+
+(define height
+  (match-lambda
+    [(tree t)
+     (height-tree t)]
+    [(hc-append es)
+     (apply max (map height es))]))
+
+(define (render r name)
+  (define inset 8)
+  (define (render-inner r ctx)
+    (match r
+      [(tree t)
+       (render-tree t ctx)]
+      [(hc-append rs)
+       (letrec ([go (λ (rs acc)
+                      (if (empty? rs)
+                          (send ctx translate (- acc) 0)
+                          (let ([r (first rs)]
+                                [rs (rest rs)])
+                            (render-inner r ctx)
+                            (let ([width (width r)])
+                              (send ctx translate width 0)
+                              (go rs (+ acc width))))))])
+         (go rs 0))]))
+  (let ([ctx (new pdf-dc%
+                  [interactive #f]
+                  [width (+ inset (width r) inset)]
+                  [height (+ inset (height t) inset)]
+                  [output (format "~a.pdf" name)])])
+    (send ctx start-doc (symbol->string (gensym 'doc)))
+    (send ctx start-page)
+    (send ctx set-text-mode 'transparent)
+    (send ctx translate (+ inset (tree-left-width t)) (+ inset (n-e/2 t)))
+    (draw-tree t ctx)
+    (send ctx end-page)
+    (send ctx end-doc)))
+
 (define unit 32)
 (define unit/2 (/ unit 2))
 (define unit/4 (/ unit 4))
@@ -58,20 +106,36 @@
   (+ (tree-left-width t)
      (tree-right-width t)))
 
+(define fill-color
+  (match-lambda
+    ['B  "black"]
+    ['R  "red"]
+    ['BB "white"]))
+
+(define label-color
+  (match-lambda
+    ['B  "white"]
+    ['R  "white"]
+    ['BB "black"]))
+
 (define (draw-node color label ctx)
-  (let-values ([(fill-color label-color)
-                (match color
-                  ['B  (values "black" "white")]
-                  ['R  (values "red" "white")]
-                  ['BB (values "white" "black")])])
+  (let ([fill-color (fill-color color)]
+        [label-color (label-color color)])
     (send ctx set-brush fill-color 'solid)
     (send ctx draw-ellipse (- unit/2) (- unit/2) unit unit)
     (let-values ([(width height descender-height extra) (send ctx get-text-extent label)])
       (send ctx set-text-foreground label-color)
       (send ctx draw-text label (- (/ width 2)) (- (- (/ (- height descender-height) 2)) 2)))))
-                  
-(define (draw-tree t ctx)
-  (match t
+
+(define (draw-leaf color ctx)
+  (let-values ([fill-color (fill-color color)])
+    (send ctx set-pen "black" outline-width 'solid)
+    (send ctx set-brush fill-color 'solid)
+    (send ctx draw-ellipse (- unit/8) (- unit/8) unit/4 unit/4)))
+
+(define (render-tree t ctx)
+  (define (render-tree-inner t ctx)
+    (match t
     [`(label ,l)
      (let ([pen (send ctx get-pen)]
            [brush (send ctx get-brush)])
@@ -85,9 +149,9 @@
        (send ctx set-pen pen)
        (send ctx set-brush brush))]
     ['(L)
-     (send ctx set-pen "black" outline-width 'solid)
-     (send ctx set-brush "black" 'solid)
-     (send ctx draw-ellipse (- unit/8) (- unit/8) unit/4 unit/4)]
+     (draw-leaf 'B ctx)]
+    ['(BB)
+     (draw-leaf 'BB ctx)]
     [`(B ,a ,x ,b)
      (send ctx set-pen "black" outline-width 'solid)
      
@@ -148,6 +212,8 @@
        (send ctx translate (- dx) (- dy)))
      
      (draw-node 'BB (format "~a" x) ctx)]))
+  (send ctx translate (+ inset (tree-left-width t)) (+ inset (n-e/2 t)))
+  (render-tree-inner t ctx))
 
 (define inset 8)
 
@@ -157,9 +223,6 @@
                   [width (+ inset (tree-width t) inset (- inset))]
                   [height (+ inset (tree-height t) inset (- inset))]
                   [output (format "~a.pdf" name)])])
-    (displayln (tree-width t))
-    (displayln (tree-left-width t))
-    (displayln (tree-height t))
     (send ctx start-doc (symbol->string (gensym 'doc)))
     (send ctx start-page)
     (send ctx set-text-mode 'transparent)
@@ -178,18 +241,21 @@
              "red-black-left-subtree")
 
 (render-tree '(B (R (label "a") "x" (label "b")) "y" (L))
-             "red-black-left-subtree")
+             "black-red-left-subtree")
+
+(render-tree '(B (L) "x" (L))
+             "single-black")
 
 #;(render-tree '(R (BB (label "a") "x" (label "b")) "y" (B (label "c") "z" (label "d")))
-             "red-top-before")
+               "red-top-before")
 
 #;(render-tree '(B (R (B (label "a") "x" (label "b")) "y" (label "c")) "z" (label "d"))
-             "red-top-after")
+               "red-top-after")
 
 #;(render-tree '(B (BB (label "a") "v" (label "b"))
-                 "w"
-                 (R (B (label "c") "x" (label "d"))
-                    "y"
-                    (B (label "e") "z" (label "f"))))
-             "black-top-red-sibling-before")
+                   "w"
+                   (R (B (label "c") "x" (label "d"))
+                      "y"
+                      (B (label "e") "z" (label "f"))))
+               "black-top-red-sibling-before")
 
