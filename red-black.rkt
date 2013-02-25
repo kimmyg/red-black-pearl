@@ -736,20 +736,20 @@
                               (tree (L))))
           "empty-step")
   
-  (render (hc-append 16 (list (tree (R (L) "x" (L)))
+  (render (hc-append 16 (list (tree (R (L) "k" (L)))
                               arrow
                               (tree (L))))
           "single-red-step")
   
-  (render (tree (R (B "a" "x" "b") "y" (L)))
+  (render (tree (R (B "a" "x" "b") "k" (L)))
           "red-black-left-subtree")
   
-  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "y" (L)))
+  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "k" (L)))
                               arrow
                               (tree (B "a" "x" "b"))))
           "black-red-left-subtree-step")
   
-  (render (tree (B (L) "x" (L)))
+  (render (tree (B (L) "k" (L)))
           "single-black")
   
   (render (tree (BB "a" "x" "b"))
@@ -758,7 +758,7 @@
   (render (tree (L2))
           "double-black-leaf")
   
-  (render (hc-append 16 (list (tree (B (L) "x" (L)))
+  (render (hc-append 16 (list (tree (B (L) "k" (L)))
                               arrow
                               (tree (L2))))
           "single-black-step")

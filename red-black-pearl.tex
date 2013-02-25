@@ -66,17 +66,17 @@ to review and as an example to introduce our reasoning methods, we go over inser
 
 Okasaki \cite{okasaki1999functional} made functional red-black trees accessible by presenting a clear method for element insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
 
-Using a bit of syntactic sugar on top of Racket, we can express the \texttt{insert} function with
+Using a bit of syntactic sugar on top of Racket, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
 \begin{verbatim}
-(define (insert t v)
+(define (insert t k)
   (match t
-    [(L) (R (L) v (L))]
+    [(L) (R (L) k (L))]
     [(N c a x b)
      (switch-compare
-       (v x)
-       [< (balance (N c (insert a v) x b))]
+       (k x)
+       [< (balance (N c (insert a k) x b))]
        [= (N c a x b)]
-       [> (balance (N c a x (insert b v)))])]))
+       [> (balance (N c a x (insert b k)))])]))
 \end{verbatim}
 where \texttt{balance} yet remains undefined.
 
@@ -100,17 +100,17 @@ The purpose of this transformation is to resolve a violation of the local proper
 
 The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which is benign in all cases. This requires a small modification of \texttt{insert} to 
 \begin{verbatim}
-(define (insert t v)
-  (define (ins t v)
+(define (insert t k)
+  (define (ins t k)
     (match t
-      [(L) (R (L) v (L))]
+      [(L) (R (L) k (L))]
       [(N c a x b)
        (switch-compare
-         (v x)
-         [< (balance (N c (insert a v) x b))]
+         (k x)
+         [< (balance (N c (insert a k) x b))]
          [= (N c a x b)]
-         [> (balance (N c a x (insert b v)))])]))
-  (blacken (ins t v)))
+         [> (balance (N c a x (insert b k)))])]))
+  (blacken (ins t k)))
 \end{verbatim}
 with \texttt{blacken} given by
 \begin{verbatim}
@@ -128,37 +128,42 @@ Our formulation of the red-black invariants allows trees to have red roots in so
 
 \section{Deletion}
 
-the general strategy to remove items from a binary tree is to replace the item with the minimum of its right subtree and delete the node that contained that. along with the base cases, that reduces all deletion to nodes at the bottom of the tree. in a balanced binary tree, we can use this approach, but we must ensure that its particular constraints are satisfied. for a red-black tree, that means no red-red violations and to maintain the global property.
+Insertion in binary trees has the advantage that new nodes are added only to the fringe, whereas deletion might also target interior nodes. With deletion, we only have to be slightly clever to reduce the latter situation to the former: when deleting a value that resides in an interior node, replace that node's value with the minimum value of its right subtree, and delete that value from that subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min-element} function for free, which is critical for priority queues.} This strategy contains a reference to deletion itself, so, like insertion, this approach can be defined recursively. Roughly, we express it by
+\begin{verbatim}
+(define (delete t k)
+  (match t
+    [(N c a x b)
+     (switch-compare
+       (k x)
+       [< (N c (delete a k) x b)]
+       [= (let ([v (min-element b)])
+            (N c a v (delete b k)))]
+       [> (N c a x (delete b k))])]))
+\end{verbatim}
+Essentially, this algorithm first locates the given value with a simple binary search and then applies our strategy, invoking itself. By enhancing this approach to account for red-black properties, we obtain a sound, persistent method of deletion from red-black trees!
 
-Deletion in unrestricted binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. Otherwise, replace its value with the minimum value of its right subtree and delete that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min-element} function for free, which is critical for priority queues.} Thus, like insertion, deletion is recursive.
+We start by considering the genuine base cases of the delete algorithm: the configurations that don't entail a node with a right subtree from which we can extract the minimum element.
 
-By removing the minimum element from the right subtree and recurring, the algorithm repeatedly finds the leftmost node in a given subtree, and only bottoms out when that node has no right child. In an unrestricted binary search tree, this algorithm could recur on the entire tree/a lot/numerous times. The restrictions of red-black trees impose a tight bound on this algorithm's recursion depth: specifically, the global property ensures that the right subtree of
-\begin{center}
-\includegraphics{black-red-right-subtree-unbounded.pdf}
-\end{center}
-is at worst
-\begin{center}
-\includegraphics{black-red-right-subtree-bounded.pdf}
-\end{center}
-and that
-\begin{center}
-\includegraphics{red-black-right-subtree.pdf}
-\end{center}
-cannot occur. (What is my point here?)
-When consideringBy applying this deletion approach to red-black trees, we reduce it to removing nodes from the tree that have at most one singleton subtree.
+\begin{itemize}
 
-We will modify this general approach to account for red-black properties. The deletion algorithm proceeds by first locating the value's housing node in the tree and then removing it based on the structure of that subtree. We start by considering the configurations of a node with no right subtree from which we can extract the minimum element. These are the genuine base cases for the delete algorithm.
-
-\begin{enumerate}
-\item If the value to delete is not present in the tree, the search will terminate on an empty tree, and the value will be removed from that. This presents no difficulty: the empty tree remains unchanged after the removal of any element.
+\item If the value to delete is not present in the tree, the search will terminate on an empty tree. This presents no difficulty: the empty tree remains unchanged after the removal of any element.
 \begin{center}
 \includegraphics{empty-step.pdf}
 \end{center}
+As a case for the \texttt{delete} function, this can be written
+\begin{verbatim}
+[(L) (L)]
+\end{verbatim}
+
 
 \item Because red nodes do not contribute to the height of the tree, we can soundly remove them from the bottom. Therefore, a single red node becomes the empty tree.
 \begin{center}
 \includegraphics{single-red-step.pdf}
 \end{center}
+As a case for the \texttt{delete} function, this is
+\begin{verbatim}
+[(R (L) (== k) (L)) (L)]
+\end{verbatim}
 
 \item A red node with a black-rooted left subtree
 \begin{center}
@@ -170,7 +175,10 @@ violates the global property and cannot occur.
 \begin{center}
 \includegraphics{black-red-left-subtree-step.pdf}
 \end{center}
-The global property dictates that the left subtree is at most a single red node, so there is no chance that this introduces a global violation.
+Conceptually, we are only removing a single red node from the tree. Absent subtree merging, this is completely straightforward. As a case for the \texttt{delete} function, this is
+\begin{verbatim}
+[(B (R a x b) (== k) (L)) (B a x b)]
+\end{verbatim}
 
 \item Finally, a black node with no left or right subtree
 \begin{center}
@@ -189,7 +197,25 @@ can be classified. For accounting purposes, a double-black node contributes two 
 \includegraphics{single-black-step.pdf}
 \end{center}
 
-\end{enumerate}
+\end{itemize}
+
+
+WHEN TALKING ABOUT WHY WE DON'T SPECIAL CASE THE RIGHT TREE STUFF
+
+After the initial, each invocation of \texttt{delete} targets the minimum value of the given tree. This entails traversing to the leftmost node of the tree and recurring on its right subtree, only bottoming out when it lacks one. In an unrestricted binary search tree, this approach recurs on the entire tree in the worst case! Fortunately, the restrictions of red-black trees impose a tight bound on this its maximum recursion depth when applied to them. Specifically, the global property ensures that the right subtree of
+\begin{center}
+\includegraphics{black-red-right-subtree-unbounded.pdf}
+\end{center}
+is at worst
+\begin{center}
+\includegraphics{black-red-right-subtree-bounded.pdf}
+\end{center}
+and that
+\begin{center}
+\includegraphics{red-black-right-subtree.pdf}
+\end{center}
+cannot occur. This limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point.
+
 
 go over base cases, ending in black. this case is difficult because the removal of a black node alters the height of the tree--the number of black nodes in this path--and so violates the global property.
 
@@ -377,74 +403,25 @@ Suppose we have a basic implementation of a red-black tree in a language that su
 
 
 
-Red-black trees have a local [more like recursive] invariant which induces a global property.
+%Red-black trees have a local [more like recursive] invariant which induces a global property.
 
-\section{Deletion}
+%\section{Deletion}
 
-To support this operation, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright \cite[p. 50]{okasaki1996purely}. This approach trades a rebalancing operation at removal for a global tree rebuild at time indeterminate ( and preserves time complexity only by amortizing the cost). This approach has other disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked [, and the global rebuild condition must be tracked]. [Show example if need content.] Second, retaining references to ``deleted'' node data prevents it from being garbage-collected. [Elaborate if need content.]
-
-
-%The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
-
-%Removal of [Okasaki] nodes from trees can be accomplished by marking a node as deleted and deferring the actual removal to a batch removal performed when deleted nodes begin to outnumber the others. This operation gives even lower than amortized logarithmic time complexity and doesn't interfere with the complexity of other tree operations.
-
-%What is the argument for a removal operation with immediate complexity of O(log n)?
-%Okasaki's thesis, page 50 (as numbered), par. 3: this mentions the cost of marking the node as deleted, but doesn't factor it into the amortized cost, correct? If we have n nodes and "delete" n/2, that takes (n log n)/2 operations. The rebuild takes n operations. So the amortized complexity is [(n log n)/2 + n]/(n/2)=log n + 1/2, or log n. So, the complexity is the same, but there is a constant factor. What happens if we add and remove the element multiple times. The addition has an immediate complexity and so is taken care of. The deletion has an amortized complexity, but say each deleted node was added and deleted k times. Then more deletes are happening over which the n/2 cost is spread, so it's actually better.
-
-%An immediate delete localizes the (conceptual /and/ time) complexity of the data structure. (Conceptually, because a counter needs to be kept in the other case, unless you want to incur an O(n) operation every time you want to delete.)
-
-%A red-black tree must satisfy two invariants:
+%To support this operation, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright \cite[p. 50]{okasaki1996purely}. This approach trades a rebalancing operation at removal for a global tree rebuild at time indeterminate ( and preserves time complexity only by amortizing the cost). This approach has other disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked [, and the global rebuild condition must be tracked]. [Show example if need content.] Second, retaining references to ``deleted'' node data prevents it from being garbage-collected. [Elaborate if need content.]
 
 
-
-%The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
-
-%There are x operations generally defined for red-black trees.
-
-%Red-black trees are typically used as the backing store for finite subsets of 
-%a totally-ordered set or finite maps with a totally-ordered domain.
-
-%Emphasize that we would like to localize the complexity.
-
-%If we mark nodes as deleted, every operation must know about deleted nodes.
-%In order to add the delete operation [in this way], we must modify every 
-%other operation.
-
-%THIS IS BIG: real research is going to come from a question in the form of
-%"prove or disprove". Being told something is true (or good) and asked to 
-%justify it is going to lead to disintegrity.
-
-%First, the implementation of a simple binary tree.
 
 
 %enforcing invariants with types leads to Byz
 
-Red-black trees were born in the imperative world and only adopted into the functional. Okasaki's exposition of the simplicity of a functional implementation actually felt more like a rebirth than mere adoption. With this regime shift came a shift in focus: the energy that would otherwise have been spent on pointer manipulation is now applied to establishing correctness with formal methods--a step forward, to be sure--but one wonders if there is a simple, obviously-correct, functional delete. Indeed there is.
-
-
-
-
-Where imperative programmers devote their energies to pointer manipulation
+%Red-black trees were born in the imperative world and only adopted into the functional. Okasaki's exposition of the simplicity of a functional implementation actually felt more like a rebirth than mere adoption. With this regime shift came a shift in focus: the energy that would otherwise have been spent on pointer manipulation is now applied to establishing correctness with formal methods--a step forward, to be sure--but one wonders if there is a simple, obviously-correct, functional delete. Indeed there is.
 
 
 
 
 
-
-
-
-Suppose the value we wish to delete happens to reside in a node at the bottom of the tree. There are two possibilites:
-
-%\includegraphics[scale=0.20]{red-black-slides-008.png}
-
-The delicate thing here is that we need to maintain the invariant that every path from the root of the tree to the bottom has the same number of black nodes. In the case that our value resides in a red node, we can intuitively see that replacing that entire subtree with a black leaf will preserve the invariant. A conceptual viewpoint that will serve us well is that the leaves donated their ``blackness'' to the parent, preserving the invariant. By applying the same idea to the second case, we must decide what happens when the ``blackness'' is propagated upward to a black node. As a conceptual convenience, we can temporarily assign the node a color of double black. This means that when counting the number of black nodes in a path which contains this node, we count this node twice. Of course, this is strictly for accounting purposes, and the node of course has the same computational cost to traverse as any other node. We will simply use this new color to account for bubbling which needs to travel up the tree.
-
-Now we can consider the cases that the node is not at the end of the tree. First, consider the case where the node in question has only one child subtree. In order for this occur, the node would have to be black with a red child. (And we can say even more about this child: it has no children of its own, else the tree would stray from the path invariant.) The child becomes the parent and is made black. [Can we motivate this with the color arithmetic?]
-
-learn the algorithm and then think about it.
 
 \section{Conclusion}
-It is true that genuine deletion is complex, but its complexity is fairly localized. Aside from the \texttt{delete} function proper, it requires the extension of the \texttt{Color} datatype to support two more atomic variants and a few helper functions to support color arithmetic. [It's a small price to pay.] In exchange, we receive O(log n) direct time complexity without any additional constant factor above the original implementation.
 
 
 
