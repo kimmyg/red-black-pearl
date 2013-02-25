@@ -722,15 +722,24 @@
   (render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
           "four-cases-resolved")
   
+  (render (tree (B (L) "x" (R "a" "y" "b")))
+          "black-red-right-subtree-unbounded")
+
+  (render (tree (B (L) "x" (R (L) "y" (L))))
+          "black-red-right-subtree-bounded")
+
+  (render (tree (R (L) "x" (B "a" "y" "b")))
+          "red-black-right-subtree")
+  
   (render (hc-append 16 (list (tree (L))
                               arrow
                               (tree (L))))
-          "empty")
+          "empty-step")
   
   (render (hc-append 16 (list (tree (R (L) "x" (L)))
                               arrow
                               (tree (L))))
-          "single-red")
+          "single-red-step")
   
   (render (tree (R (B "a" "x" "b") "y" (L)))
           "red-black-left-subtree")
@@ -738,7 +747,10 @@
   (render (hc-append 16 (list (tree (B (R "a" "x" "b") "y" (L)))
                               arrow
                               (tree (B "a" "x" "b"))))
-          "black-red-left-subtree")
+          "black-red-left-subtree-step")
+  
+  (render (tree (B (L) "x" (L)))
+          "single-black")
   
   (render (tree (BB "a" "x" "b"))
           "double-black-tree")
@@ -749,7 +761,7 @@
   (render (hc-append 16 (list (tree (B (L) "x" (L)))
                               arrow
                               (tree (L2))))
-          "single-black")
+          "single-black-step")
   
   (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
                               arrow

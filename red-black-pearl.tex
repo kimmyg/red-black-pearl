@@ -41,11 +41,9 @@ red-black tree, delete, data structure
 
 \section{Introduction}
 
-When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary search tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension. Used in this way, red-black trees are efficient, persistent, and still leave us wanting.
+When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary search tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension.
 
-Deletion from red-black trees is notoriously complex. In the imperative world, programmers must contend with a bevy of cases and must concern themselves with pointer manipulation. In the functional world, that same attention is devoted to correctness whether it be enforced by types [cite Kahrs] or proved by formal methods [cite Appel]. A functional implementation of deletion from red-black trees should enjoy an intuition.
-
-To see why, let's briefly review what makes red-black trees so special. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the local property that
+The usefulness of red-black trees stems from their balanced nature. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the local property that
 \begin{enumerate}
 \item every red node has two black children,
 \end{enumerate}
@@ -55,6 +53,14 @@ and the global property that
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are colored black.} node contains the same number of black nodes.
 \end{enumerate}
 These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of the search for an element in a red-black tree search is a reasonable constant factor over that of a a perfectly balanced tree.
+
+there hasn't been a satisfactory method to delete items; enforced with types leads to Byzantine code, proven correct is good if the language is a target for extraction, but above the capabilities of typical programmers
+
+we've encountered this situation before: Okasaki gave a functional rendition of tree insertion and a smashing intuition at the same time. the intuition, from which the code can be derived, is what we're after: we want a fairly simple, obviously correct way to perform tree deletion.
+
+INSERTION
+
+to review and as an example to introduce our reasoning methods, we go over insertion.
 
 \section{Insertion}
 
@@ -92,17 +98,6 @@ Furthermore, we can reason locally about the effect this transformation has on t
 
 The purpose of this transformation is to resolve a violation of the local property, and while it does resolve one, it potentially introduces another further up the tree. We can treat this violation the same way and even with the same function; hence, the \texttt{balance} function is applied preventively at each level of the recursion which has the effect of working up the tree as the semantic stack unwinds. This transformation cannot possibly introduce a red-red violation at the root of the tree, being the child of no node, so the correctness of the entire process follows from a simple inductive argument.
 
-Much of the simplicity of Okasaki's explanation comes from the simplicity of going from the diagrams to
-\begin{verbatim}
-(define/match balance
-  [(or (B (R (R a x b) y c) z d)
-       (B (R a x (R b y c)) z d)
-       (B a x (R (R b y c) z d))
-       (B a x (R b y (R c z d))))
-   (R (B a x b) y (B c z d))]
-  [t t])
-\end{verbatim}
-
 The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which is benign in all cases. This requires a small modification of \texttt{insert} to 
 \begin{verbatim}
 (define (insert t v)
@@ -117,7 +112,135 @@ The final stop of Okasaki's insertion algorithm is to blacken the root of the tr
          [> (balance (N c a x (insert b v)))])]))
   (blacken (ins t v)))
 \end{verbatim}
-with a trivial definition of \texttt{blacken}.
+with \texttt{blacken} given by
+\begin{verbatim}
+(define/match blacken
+  [(N _ a x b) (N 'B a x b)])
+\end{verbatim}
+
+Our formulation of the red-black invariants allows trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it. This leads only to a change to \texttt{blacken}, which is now
+\begin{verbatim}
+(define/match blacken
+  [(R (R? a) x b) (B a x b)]
+  [(R a x (R? b)) (B a x b)]
+  [t t])
+\end{verbatim}
+
+\section{Deletion}
+
+the general strategy to remove items from a binary tree is to replace the item with the minimum of its right subtree and delete the node that contained that. along with the base cases, that reduces all deletion to nodes at the bottom of the tree. in a balanced binary tree, we can use this approach, but we must ensure that its particular constraints are satisfied. for a red-black tree, that means no red-red violations and to maintain the global property.
+
+Deletion in unrestricted binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. Otherwise, replace its value with the minimum value of its right subtree and delete that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min-element} function for free, which is critical for priority queues.} Thus, like insertion, deletion is recursive.
+
+By removing the minimum element from the right subtree and recurring, the algorithm repeatedly finds the leftmost node in a given subtree, and only bottoms out when that node has no right child. In an unrestricted binary search tree, this algorithm could recur on the entire tree/a lot/numerous times. The restrictions of red-black trees impose a tight bound on this algorithm's recursion depth: specifically, the global property ensures that the right subtree of
+\begin{center}
+\includegraphics{black-red-right-subtree-unbounded.pdf}
+\end{center}
+is at worst
+\begin{center}
+\includegraphics{black-red-right-subtree-bounded.pdf}
+\end{center}
+and that
+\begin{center}
+\includegraphics{red-black-right-subtree.pdf}
+\end{center}
+cannot occur. (What is my point here?)
+When consideringBy applying this deletion approach to red-black trees, we reduce it to removing nodes from the tree that have at most one singleton subtree.
+
+We will modify this general approach to account for red-black properties. The deletion algorithm proceeds by first locating the value's housing node in the tree and then removing it based on the structure of that subtree. We start by considering the configurations of a node with no right subtree from which we can extract the minimum element. These are the genuine base cases for the delete algorithm.
+
+\begin{enumerate}
+\item If the value to delete is not present in the tree, the search will terminate on an empty tree, and the value will be removed from that. This presents no difficulty: the empty tree remains unchanged after the removal of any element.
+\begin{center}
+\includegraphics{empty-step.pdf}
+\end{center}
+
+\item Because red nodes do not contribute to the height of the tree, we can soundly remove them from the bottom. Therefore, a single red node becomes the empty tree.
+\begin{center}
+\includegraphics{single-red-step.pdf}
+\end{center}
+
+\item A red node with a black-rooted left subtree
+\begin{center}
+\includegraphics{red-black-left-subtree.pdf}
+\end{center}
+violates the global property and cannot occur.
+
+\item A black node with a red-rooted left subtree becomes the subtree itself, only black-rooted.
+\begin{center}
+\includegraphics{black-red-left-subtree-step.pdf}
+\end{center}
+The global property dictates that the left subtree is at most a single red node, so there is no chance that this introduces a global violation.
+
+\item Finally, a black node with no left or right subtree
+\begin{center}
+\includegraphics{single-black.pdf}
+\end{center}
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. Thus, the careless excision of it would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color of which both branches
+\begin{center}
+\includegraphics{double-black-tree.pdf}
+\end{center}
+and leaves
+\begin{center}
+\includegraphics{double-black-leaf.pdf}
+\end{center}
+can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion. 
+\begin{center}
+\includegraphics{single-black-step.pdf}
+\end{center}
+
+\end{enumerate}
+
+go over base cases, ending in black. this case is difficult because the removal of a black node alters the height of the tree--the number of black nodes in this path--and so violates the global property.
+
+following the wisdom of Okasaki, we will take the approach of maintaining the global property at the expense of the local. we do this by temporarily introducing a double black node into the tree for accounting purposes. considering a local portion of the tree, we perform tree rotations in an attempt to discharge the black node. there are only three cases, with their reflections.
+
+in the first case, with a red node as parent, we are able to discharge the double-black node. the inner subtree of the black node could be red, so this may introduce a local red-red violation. we have just the function to handle this in \texttt{balance}! because the parent node of this tree began as red, a balance operation will not introduce a red-red violation higher in the tree as it can with insertion. for the same reason, no violation occurs if the balance is unnecessary.
+
+the second case is when both the parent and sibling nodes are black. in this case, we cannot discharge the black node locally and must propagate it up the tree. like the first case, we may introduce a red-red violation here, but, because of the placement of the double-black node, cannot resolve it with the \texttt{balance} function. our solution is to extend the balance function to handle a double-black root. just as with a regular black root, we have four cases to consider
+
+cases
+
+each of which can be resolved by transforming it into this tree.
+
+resolved-case.
+
+In addition to maintaining the global property and immediately resolving a local violation, there is no way that we can introduce a local violation. Furthermore, we are able to discharge the double black node by balancing!
+
+the last case is the most complex: a black parent and a red sibling. in this case, we rely on the fact that the red sibling must have nonempty left and right subtrees, and that they must be black rooted. by also considering these nephews of the double-black node, we can discharge the double black node immediately. there is once again the possibility that we introduce a red-red violation, but it is in a subtree of the result. we cope with this by balancing this subtree during construction of the rotation.
+
+note that if the parent or sibling node is red, the double-black node can be discharged immediately.
+
+like the insertion algorithm, the recursive nature of delete allows us to work our way up the tree as we unwind, rotating if necessary. we might wonder if a double-black node is ever propagated to the root. if it were, the remedy would be simple: color the root node black if necessary as is done in the insertion algorithm. this is completely satisfactory, but requires us to expose the \texttt{blacken} function to the transient double-black leaf and node. in order to contain it as much as possible, we perform the dual operation when deleting as when inserting; that is, instead of blackening the root node if necessary to complete insertion, we redden the root node if possible to prepare deletion. if it is not possible, then the root node must have at least one red child, and so, in any case, there will be red slack in the tree with which to discharge the node.
+
+CONCLUSION
+
+Okasaki gave intuition to insertion in a functional paradigm, which made red-black trees accessible, albeit limited. A simple, intuitive, obviously correct deletion method might do the same thing and remove the limitation.
+
+
+
+Used in this way, red-black trees are efficient, persistent, and still leave us wanting.
+
+Deletion from red-black trees is notoriously complex. In the imperative world, programmers must contend with a bevy of cases and must concern themselves with pointer manipulation. In the functional world, that same attention is devoted to correctness whether it be enforced by types [cite Kahrs] or proved by formal methods [cite Appel]. A functional implementation of deletion from red-black trees should enjoy an intuition.
+
+
+
+
+
+
+
+Much of the simplicity of Okasaki's explanation comes from the simplicity of going from the diagrams to
+\begin{verbatim}
+(define/match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))]
+  [t t])
+\end{verbatim}
+
+
 
 
 %We can reason about this transformation purely locally by considering the number of black nodes this portion of the tree contributes to each path that travels through it.
@@ -130,50 +253,13 @@ Maybe move.
 
 In addition to introducing a functional treatment of tree insertion, Okasaki succeeded in adding intuition to something generally considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake. As a result, the attitude of intricacy and proneness to error has shifted to tree deletion. While we grant that deletion seems to be more complex than insertion, we hope to show that it is only slightly so, and that, with the right intuition, it can enjoy the same status as insertion.
 
-Deletion in unrestricted binary search trees is fairly straightforward. First, locate the node that contains the value to delete. If the node has no right subtree, replace it with its left subtree. If it has a right subtree, replace its value with the minimum value of its right subtree and remove that value from the right subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min\_element} function for free, which is critical for priority queues.} Thus, deletion is recursive.
 
-We can modify this approach to account for red-black properties and ultimately preserve them. We start by considering the configurations of a node with no right subtree.
-
-The empty tree remains unchanged after the removal of any element.
-\begin{center}
-\includegraphics{empty.pdf}
-\end{center}
-
-A red node with no left or right subtree becomes the empty tree.
-\begin{center}
-\includegraphics{single-red.pdf}
-\end{center}
-
-A red node with a black-rooted left subtree
-\begin{center}
-\includegraphics{red-black-left-subtree.pdf}
-\end{center}
-violates the global property and cannot occur.
-
-A black node with a red-rooted left subtree becomes the subtree itself, only black-rooted.
-\begin{center}
-\includegraphics{black-red-left-subtree.pdf}
-\end{center}
-The global invariant dictates that the left subtree is at most a single red node, so there is no chance that this introduces a violation.
-
-Finally, a black node with no left or right subtree presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. If we were to treat this case the same as if the node were red, we would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color of which both branches
-\begin{center}
-\includegraphics{double-black-tree.pdf}
-\end{center}
-and leaves
-\begin{center}
-\includegraphics{double-black-leaf.pdf}
-\end{center}
-can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion. 
-\begin{center}
-\includegraphics{single-black.pdf}
-\end{center}
 
 %Of course, we cannot let such a node persist, or we'll have no hope of maintaing optimal time complexity. We can attempt to discharge it by performing a tree rotation...
 
 Much like insertion, we have to account for the possibility of a deletion operation introducing a double-black node from the start. Where the insertion operation balances the tree, attempting to resolve red-red violations, the deletion operation rotates the tree, attempting to discharge double-black nodes. Just as the insertion operation possibly passes unbalance up the tree, the deletion operation possibly passes a double-black node up the tree. Finally, both operations ``bottom out'' at the top of the tree, guaranteeing resolution.
 
-The final step of Okasaki's algorithm unilaterally changes the root node to black. The red-black invariants, as we have formulated them, allow trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it.
+The final step of Okasaki's algorithm unilaterally changes the root node to black. 
 
 When inserting an element, our final step is to blacken the root, but only if necessary. Dual to this, when deleting an element, our \emph{first} step is to redden the root, but only if possible. This gives us slack if the ascending rotations happen to make it to the root. (If we are unable to redden the tree without violating the local condition, then at least on of the children must itself be red which puts a red node sufficiently close to the action.)
 
@@ -289,37 +375,7 @@ Suppose we have a basic implementation of a red-black tree in a language that su
   (del (redden t) v cmp))
 \end{verbatim}
 
-\begin{verbatim}
-data Color = R | B
-data Tree a = E | T Color (Tree a) a (Tree a)
 
-type Set a = Tree a
-
-empty :: Set a
-empty = E
-
-member :: Ord a => a -> Set a -> Bool
-member x E = False
-member x (T _ l y r) | x <  y = member x l
-                     | x == y = True
-                     | x >  y = member x r 
-
-insert :: (Ord a) => a -> Set a -> Set a
-insert x s = makeBlack (ins s)
-  where ins E = T R E x E
-        ins (T color l y r) | x <  y = balance color (ins l) y r
-                            | x == y = T color a y b
-                            | x >  y = balance color l y (ins r)
-        makeBlack (T _ l y r) = T B l y r
-\end{verbatim}
-Once the need for balancing is properly motivated and intuition described, the [novelty,bulk,workhorse,?] of the algorithm lies in the \texttt{balance} operation. The punchline of Okasaki's exposition is this simple, elegant implementation.
-\begin{verbatim}
-balance B (T R (T R a x b) y c) z d
-     || B (T R a x (T R b y c)) z d
-     || B a x (T R (T R b y c) z d)
-     || B a x (T R b y (T R c z d)) = T R (T B a x b) y (T B c z d)
-balance color a x b = T color a x b
-\end{verbatim}
 
 Red-black trees have a local [more like recursive] invariant which induces a global property.
 
@@ -327,52 +383,6 @@ Red-black trees have a local [more like recursive] invariant which induces a glo
 
 To support this operation, he suggests the approach of marking nodes as deleted instead of removing them from the tree outright \cite[p. 50]{okasaki1996purely}. This approach trades a rebalancing operation at removal for a global tree rebuild at time indeterminate ( and preserves time complexity only by amortizing the cost). This approach has other disadvantages. First, it contaminates the implementation: every operation needs to be taught about the deletion field and how to handle nodes so marked [, and the global rebuild condition must be tracked]. [Show example if need content.] Second, retaining references to ``deleted'' node data prevents it from being garbage-collected. [Elaborate if need content.]
 
-To support deletion using this strategy, we first introduce a flag in the datatype indicating whether the element should be considered present or not, and teach the operations on that data type about the flag.
-\begin{verbatim}
-data Color = R | B
-data Tree a = E | T Color Bool (Tree a) a (Tree a)
-
-type Set a = Tree a
-
-empty :: Set a
-empty = E
-
-member :: Ord a => a -> Set a -> Bool
-member x E = False
-member x (T _ f l y r) | x <  y = member x l
-                       | x == y = f
-                       | x >  y = member x r 
-
-insert :: (Ord a) => a -> Set a -> Set a
-insert x s = makeBlack (ins s)
-  where ins E = T R True E x E
-        ins (T color flag a y b) | x <  y = balance color flag (ins a) y b
-                                 | x == y = T color True a y b
-                                 | x >  y = balance color flag a y (ins b)
-        makeBlack (T _ f a y b) = T B flag a y b
-\end{verbatim}
-We omit the corresponding changes to \texttt{balance}. With that in place, a first pass at a \cite{delete} operation can be made:
-\begin{verbatim}
-delete :: Ord a -> a -> Set a -> Set a
-delete x E = E
-delete x (T color flag a y b) | x <  y = T color flag (delete x a) y b
-                              | x == y = T color False a y b
-                              | x >  y = T color flag a y (delete x b)
-\end{verbatim}
-The implementation is certainly correct, but it removes the time complexity guarantee that is worth the conceptual complexity. In order to preserve that, we introduce the necessary bookkeeping to trigger a global rebuild at the proper time.
-\begin{verbatim}
-data Color = R | B
-data Tree a = E | T Color Bool Int Int (Tree a) a (Tree a)
-...
-\end{verbatim}
-Once the need for balancing is properly motivated and intuition described, the [novelty,bulk,workhorse,?] of the algorithm lies in the \texttt{balance} operation. The punchline of Okasaki's exposition is this simple, elegant implementation.
-\begin{verbatim}
-balance B (T R (T R a x b) y c) z d
-     || B (T R a x (T R b y c)) z d
-     || B a x (T R (T R b y c) z d)
-     || B a x (T R b y (T R c z d)) = T R (T B a x b) y (T B c z d)
-balance color a x b = T color a x b
-\end{verbatim}
 
 %The appropriate choice of node type for a red-black tree allows it to be used for a variety of applications. (Yuck.) A singleton allows it to back mathematical sets with insert and member? operations. A pair allows it to implement dictionaries with set and lookup operations. etc. No choice of node can compensate for the lack of a remove operation.
 
@@ -385,51 +395,7 @@ balance color a x b = T color a x b
 
 %A red-black tree must satisfy two invariants:
 
-red-black trees are useful in functional programming
 
-what are they? ...
-
-there hasn't been a satisfactory method to delete items; enforced with types leads to Byzantine code, proven correct is good if the language is a target for extraction, but above the capabilities of typical programmers
-
-we've encountered this situation before: Okasaki gave a functional rendition of tree insertion and a smashing intuition at the same time. the intuition, from which the code can be derived, is what we're after: we want a fairly simple, obviously correct way to perform tree deletion.
-
-INSERTION
-
-to review and as an example to introduce our reasoning methods, we go over insertion.
-
-...
-
-our characterization of the invariants allows us to have red roots, so we change our blacken function to be more conservative: instead of blackening unilaterally, it blackens only if necessary.
-
-DELETION
-
-the general strategy to remove items from a binary tree is to replace the item with the minimum of its right subtree and delete the node that contained that. along with the base cases, that reduces all deletion to nodes at the bottom of the tree. in a balanced binary tree, we can use this approach, but we must ensure that its particular constraints are satisfied. for a red-black tree, that means no red-red violations and to maintain the global property.
-
-go over base cases, ending in black. this case is difficult because the removal of a black node alters the height of the tree--the number of black nodes in this path--and so violates the global property.
-
-following the wisdom of Okasaki, we will take the approach of maintaining the global property at the expense of the local. we do this by temporarily introducing a double black node into the tree for accounting purposes. considering a local portion of the tree, we perform tree rotations in an attempt to discharge the black node. there are only three cases, with their reflections.
-
-in the first case, with a red node as parent, we are able to discharge the double-black node. the inner subtree of the black node could be red, so this may introduce a local red-red violation. we have just the function to handle this in \texttt{balance}! because the parent node of this tree began as red, a balance operation will not introduce a red-red violation higher in the tree as it can with insertion. for the same reason, no violation occurs if the balance is unnecessary.
-
-the second case is when both the parent and sibling nodes are black. in this case, we cannot discharge the black node locally and must propagate it up the tree. like the first case, we may introduce a red-red violation here, but, because of the placement of the double-black node, cannot resolve it with the \texttt{balance} function. our solution is to extend the balance function to handle a double-black root. just as with a regular black root, we have four cases to consider
-
-cases
-
-each of which can be resolved by transforming it into this tree.
-
-resolved-case.
-
-In addition to maintaining the global property and immediately resolving a local violation, there is no way that we can introduce a local violation. Furthermore, we are able to discharge the double black node by balancing!
-
-the last case is the most complex: a black parent and a red sibling. in this case, we rely on the fact that the red sibling must have nonempty left and right subtrees, and that they must be black rooted. by also considering these nephews of the double-black node, we can discharge the double black node immediately. there is once again the possibility that we introduce a red-red violation, but it is in a subtree of the result. we cope with this by balancing this subtree during construction of the rotation.
-
-note that if the parent or sibling node is red, the double-black node can be discharged immediately.
-
-like the insertion algorithm, the recursive nature of delete allows us to work our way up the tree as we unwind, rotating if necessary. we might wonder if a double-black node is ever propagated to the root. if it were, the remedy would be simple: color the root node black if necessary as is done in the insertion algorithm. this is completely satisfactory, but requires us to expose the \texttt{blacken} function to the transient double-black leaf and node. in order to contain it as much as possible, we perform the dual operation when deleting as when inserting; that is, instead of blackening the root node if necessary to complete insertion, we redden the root node if possible to prepare deletion. if it is not possible, then the root node must have at least one red child, and so, in any case, there will be red slack in the tree with which to discharge the node.
-
-CONCLUSION
-
-Okasaki gave intuition to insertion in a functional paradigm, which made red-black trees accessible, albeit limited. A simple, intuitive, obviously correct deletion method might do the same thing and remove the limitation.
 
 %The first invariant ensures that at most one red node can separate an otherwise parent and child. Coupled with the second invariant, we are guaranteed that the longest path from the root to an empty node is at most twice as long as the shortest path, with the difference made up by interspersed red nodes.
 
