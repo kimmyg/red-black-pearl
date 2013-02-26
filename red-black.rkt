@@ -16,39 +16,39 @@
 
 (define-match-expander B
   (syntax-rules ()
-    [(_)       (or (L)
-                   (N 'B _ _ _))]
+    [(_)       (L)]
     [(_ a x b) (N 'B a x b)])
   (syntax-rules ()
+    [(_)       (L)]
     [(_ a x b) (N 'B a x b)]))
 
 (define-match-expander B?
   (syntax-rules ()
-    [(_ a) (and (B) a)])
+    [(_ a) (and (or (B)
+                    (B _ _ _))
+                a)])
   (syntax-rules ()
     [(_ a) (match a
-             [(B) #t]
+             [(B? _) #t]
              [_   #f])]))
 
 (define-match-expander R
   (syntax-rules ()
-    [(_)       (N 'R _ _ _)]
     [(_ a x b) (N 'R a x b)])
   (syntax-rules ()
     [(_ a x b) (N 'R a x b)]))
 
 (define-match-expander R?
   (syntax-rules ()
-    [(_ a) (and (R) a)])
+    [(_ a) (and (R _ _ _) a)])
   (syntax-rules ()
     [(_ a) (match a
-             [(R) #t]
-             [_   #f])]))
+             [(R? _) #t]
+             [_      #f])]))
 
 (define-match-expander BB
   (syntax-rules ()
-    [(_)       (or (L2)
-                   (N 'BB _ _ _))]
+    [(_)       (L2)]
     [(_ a x b) (N 'BB a x b)])
   (syntax-rules ()
     [(_) (L2)]
@@ -56,11 +56,13 @@
 
 (define-match-expander BB?
   (syntax-rules ()
-    [(_ a) (and (BB) a)])
+    [(_ a) (and (or (BB)
+                    (BB _ _ _))
+                a)])
   (syntax-rules ()
     [(_ a) (match a
-             [(BB) #t]
-             [_    #f])]))
+             [(BB? _) #t]
+             [_       #f])]))
 
 (define empty-tree (L))
 
@@ -105,10 +107,8 @@
          (B a x (R (R b y c) z d))
          (B a x (R b y (R c z d))))
      (R (B a x b) y (B c z d))]
-    [(or (BB (R (R a x b) y c) z d)
-         (BB (R a x (R b y c)) z d)
-         (BB a x (R (R b y c) z d))
-         (BB a x (R b y (R c z d))))
+    [(or (BB (R a x (R b y c)) z d)
+         (BB a x (R (R b y c) z d)))
      (B (B a x b) y (B c z d))]
     [t t]))
 
@@ -778,11 +778,12 @@
                               (tree (B (B (R (B "a" "v" "b") "w" "c") "x" "d") "y" (B "e" "z" "f")))))
           "BB-B-R")
   
-  (render (hc-append 16 (list (tree (BB (R (R "a" "x" "b") "y" "c") "z" "d"))
-                              (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
-                              (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))
-                              (tree (BB "a" "x" (R "b" "y" (R "c" "z" "d"))))))
-          "four-cases-extended")
+  (render (hc-append 16 (list (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                              (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))))
+          "two-cases-extended")
   
   (render (tree (B (B "a" "x" "b") "y" (B "c" "z" "d")))
-          "four-cases-extended-resolved"))
+          "two-cases-extended-resolved")
+
+  (render (tree (BB (L) "k" (BB (L) "x" (BB (L) "y" "..."))))
+          "right-cascade"))
