@@ -28,7 +28,7 @@
 \maketitle
 
 \begin{abstract}
-Red-black trees were properly introduced into the functional world when Okasaki gave an intuitive method for element insertion. Even still, deletion has remained complex, being a victim of a litany of rebalancing cases and contingencies. With such little intuition, it's no wonder that authors have turned to advanced type systems and formal methods to ensure correctness. This has relegated workaday functional programmers from the privilege of implementation of delete. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
+Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion. Even still, deletion has remained complex, requiring the consideration of a litany of rebalancing cases and contingencies. With such conceptual impenetrability, it's no wonder that authors have turned to advanced type systems and formal methods to ensure correctness. This has relegated workaday functional programmers to be mere implementation consumers. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -52,9 +52,9 @@ and the global property that
 \setcounter{enumi}{1}
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are colored black.} node contains the same number of black nodes.
 \end{enumerate}
-These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of the search for an element in a red-black tree search is a reasonable constant factor over that of a a perfectly balanced tree.
+These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of the location of an element in a red-black tree operation is a reasonable constant factor over that of a a perfectly balanced tree.
 
-Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method for element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers and to go without if their functional language lacks one.
+Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers and to go without if their functional language lacks one.
 
 This situation should seem familiar. Before Okasaki's functional treatment, insertion in red-black trees suffered the same impenetrability. However, in addition to introducing a functional treatment of tree insertion, Okasaki succeeded in adding intuition to something considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
 
@@ -68,7 +68,7 @@ THREE THINGS TO REASON ABOUT: ORDERING, LOCAL, GLOBAL
 
 Okasaki \cite{okasaki1999functional} accomplished insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
 
-Using a bit of syntactic sugar on top of Racket, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
+Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
 \begin{verbatim}
 (define (insert t k)
   (match t
@@ -90,6 +90,15 @@ and transforms them into
 \begin{center}
 \includegraphics{four-cases-resolved.pdf}
 \end{center}
+Expressed in code, this is equally concise:
+\begin{verbatim}
+(define/match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))])
+\end{verbatim}
 
 In order to verify that we are not beguiled by the elegance of this transformation, we need to ensure that is has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
 
@@ -98,15 +107,6 @@ It is routine to verify that this transformation preserves a correct tree orderi
 Next, we verify that this transformation doesn't introduce any red-red violations unduly. It clearly resolves the red-red violation of its design, but we must consider any introductions of the same. We observe that, below this section of the tree, the subtrees $a$, $b$, $c$, ande $d$ are compatible with their newly-assigned parents, no matter the colorings of their roots. However, consider the parent of this section of the tree. If the parent is red, then this transformation \emph{introduces} exactly the same kind of red-red violation it resolved, only further up the tree. It is here that we rely on the recursive nature of \texttt{insert} and the application of \texttt{balance} at each step. We reason inductively that each violation introduced in this way will be handled by the same mechanism.
 
 Finally, we verify the transformation does not introduce any height violations. We do this by ensuring that the number of black nodes this section of the tree contributes to each path through it is the same before and after it occurs. Like the first property, verifying this is routine but nevertheless critical.
-
-When performing local tree transformations, we must justify the correctness of the transformation, which entails the consideration of the local property--that red nodes must have two black children--and the global property--that every path from the root to a leaf must have the same number of black nodes.
-
-We can verify that this transformation indeed resolves red-red violations by observing that the subtrees $a$, $b$, $c$, ande $d$ are compatible with their newly-assigned parents, no matter the colorings of their roots. However, consider the parent of each of the four cases. , 
-We can reason about the effect this transformation has on the local property by considering the possible colorings of the root of each subtree $a$, $b$, $c$, and $d$. If the parent of this node is red, this node must be black and there are no restrictions on its placement in the reconstruction. If the parent is black, this node is possibly red, and the assignment of a red parent possibly introduces a red-red violation. The \texttt{balance} function is designed to resolve precisely this situation. We can verify this transformation preserves the global property by verifying that any possible introduction of this violation is subjected to \texttt{balance}.
-
-Furthermore, we can reason locally about the effect this transformation has on the \emph{global} property by considering the number of black nodes this portion of the tree contributes to each path that travels through it. We can see that this transformation preserves the global property by verifying that the paths that reach the subtrees $a-d$ accumulate the same number of black nodes both before and after it occurs.
-
-The purpose of this transformation is to resolve a violation of the local property, and while it does resolve one, it potentially introduces another further up the tree. We can treat this violation the same way and even with the same function; hence, the \texttt{balance} function is applied preventively at each level of the recursion which has the effect of working up the tree as the semantic stack unwinds. This transformation cannot possibly introduce a red-red violation at the root of the tree, being the child of no node, so the correctness of the entire process follows from a simple inductive argument.
 
 The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which is benign in all cases. This requires a small modification of \texttt{insert} to 
 \begin{verbatim}
