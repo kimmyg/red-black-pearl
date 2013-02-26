@@ -18,7 +18,7 @@
 \titlebanner{Red-Black Tree Deletion}        % These are ignored unless
 \preprintfooter{Presents the missing method of Okasaki's red-black trees.}   % 'preprint' option specified.
 
-\title{Deletion: The Curse of the Red-Black Tree}
+\title{Deletion: The Curse of the Functional Red-Black Tree}
 \subtitle{Functional Pearl}
 
 \authorinfo{Kimball Germane\and Matt Might}
@@ -28,7 +28,7 @@
 \maketitle
 
 \begin{abstract}
-Red-black trees were properly introduced into the functional world when Okasaki gave an intuitive method for element insertion. Since then, deletion has remained complex, requiring formal methods or advanced type systems to support. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
+Red-black trees were properly introduced into the functional world when Okasaki gave an intuitive method for element insertion. Even still, deletion has remained complex, being a victim of a litany of rebalancing cases and contingencies. With such little intuition, it's no wonder that authors have turned to advanced type systems and formal methods to ensure correctness. This has relegated workaday functional programmers from the privilege of implementation of delete. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -53,6 +53,12 @@ and the global property that
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are colored black.} node contains the same number of black nodes.
 \end{enumerate}
 These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of the search for an element in a red-black tree search is a reasonable constant factor over that of a a perfectly balanced tree.
+
+Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method for element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs} and formal methods \cite{appel}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers and to go without if their functional language lacks one.
+
+This situation should seem familiar. Before Okasaki's functional treatment, insertion in red-black trees suffered the same impenetrability. However, in addition to introducing a functional treatment of tree insertion, Okasaki succeeded in adding intuition to something considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
+
+We aim to democratize deletion in a similar way by providing a method that is intuitive, succinct, and obviously correct
 
 there hasn't been a satisfactory method to delete items; enforced with types leads to Byzantine code, proven correct is good if the language is a target for extraction, but above the capabilities of typical programmers
 
@@ -202,11 +208,11 @@ can be classified. For accounting purposes, a double-black node contributes two 
 
 Of course, once this substitution is made, we no longer have a red-black tree, and must reconcile our newly-created tree with the red-black properties. Having adopted Okasaki's initial approach, it seems only natural to apply the rest of it, if possible.
 
-Recall that \texttt{insert} adds a red node to the tree, possibly introducing a red-red violation, and that \texttt{balance} resolves red-red violations locally, possibly introducing one higher in the tree. Because \texttt{insert} is recursive, it can apply \texttt{balance} at each level, pulling red-red violations to the root where they can be resolved unequivocally.
+Recall that \texttt{insert} adds a red node to the tree, possibly introducing a red-red violation, and that \texttt{balance} resolves a red-red violation locally, possibly introducing another higher in the tree. Because \texttt{insert} is recursive, it can apply \texttt{balance} at each level, pushing red-red violations to the root where they can be resolved unequivocally.
 
-We now find wisdom in formulating \texttt{delete} recursively, as we can apply the same strategy. Instead of introducing red-red violations to be resolved by \texttt{balance}, we introduce double-black nodes to be discharged by \texttt{rotate}.
+We now find wisdom in formulating \texttt{delete} recursively, as we can use the same strategy. Instead of introducing red-red violations to be resolved by \texttt{balance}, we introduce double-black nodes to be discharged by \texttt{rotate}.
 
-Our \texttt{delete} is now defined as
+Our \texttt{delete} function is now defined as
 \begin{verbatim}
 (define (delete t k)
   (match t
@@ -224,7 +230,7 @@ Our \texttt{delete} is now defined as
 \end{verbatim}
 with \texttt{rotate} still undefined.
 
-The \texttt{rotate} function rearranges trees whose root node has a double-black child and either discharges the double-black node immediately or moves it to the root of the tree. Surprisingly, it need only be applied to three cases and their reflections.
+The \texttt{rotate} function rearranges trees whose root node has a double-black child and either discharges the double-black node immediately or moves it to the root of the tree. Surprisingly, it need only be applied to three distinct cases and their reflections.
 
 The first case is a red-rooted tree with a double-black child. This condition is sufficient to conclude that the other child is black--not red--and is a node--not a leaf. In this case, the double black node can be discharged immediately with the rotation
 \begin{center}
@@ -256,7 +262,7 @@ This rotation presents a minor complication: because of its double-black root, t
 \begin{center}
 \includegraphics{two-cases-extended.pdf}
 \end{center}
-and transforming them each to
+and transforming each of them to
 \begin{center}
 \includegraphics{two-cases-extended-resolved.pdf}
 \end{center}
@@ -278,8 +284,9 @@ Once again, the introduction of a red-red violation is a possibility, only this 
  (B a x (balance (B b y (R c z (-B d)))))]
 \end{verbatim}
 
-We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require a minor intrusion into the \emph{blacken} function, but we opt for a different approach. Recall that the final step of \texttt{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \texttt{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
-In doing so, he overcame one deficiency and exposed another: the delete operation. Multiple strategies have been developed to offer the delete operation, but each has its own weakness.
+We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \texttt{blacken} function to the transient double-black color, but in the interest of double-black containment, we opt for a different approach. Recall that the final step of \texttt{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \texttt{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
+
+%In doing so, he overcame one deficiency and exposed another: the delete operation. Multiple strategies have been developed to offer the delete operation, but each has its own weakness.
 
 \begin{verbatim}
 (define/match balance
@@ -368,7 +375,7 @@ We have, seemingly for the sake of simplicity, omitted the black-rooted tree wit
 \begin{center}
 \includegraphics{right-cascade.pdf}
 \end{center}
-with and without this base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \texttt{delete}. Specifically, the global property ensures that the right subtree of
+with and without this base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \texttt{delete}. Specifically, the global property ensures that
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
@@ -440,7 +447,7 @@ Much of the simplicity of Okasaki's explanation comes from the simplicity of goi
 
 Maybe move.
 
-In addition to introducing a functional treatment of tree insertion, Okasaki succeeded in adding intuition to something generally considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake. As a result, the attitude of intricacy and proneness to error has shifted to tree deletion. While we grant that deletion seems to be more complex than insertion, we hope to show that it is only slightly so, and that, with the right intuition, it can enjoy the same status as insertion.
+ As a result, the attitude of intricacy and proneness to error has shifted to tree deletion. While we grant that deletion seems to be more complex than insertion, we hope to show that it is only slightly so, and that, with the right intuition, it can enjoy the same status as insertion.
 
 
 
