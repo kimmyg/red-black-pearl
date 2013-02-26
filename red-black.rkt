@@ -13,6 +13,10 @@
 (struct L2 RB-tree () #:transparent)
 (struct N RB-tree (color left-child value right-child) #:transparent)
 
+(define-syntax-rule (define-match id cases ...)
+  (define id
+    (match-lambda
+      cases ...)))
 
 (define-match-expander B
   (syntax-rules ()
@@ -30,7 +34,7 @@
   (syntax-rules ()
     [(_ a) (match a
              [(B? _) #t]
-             [_   #f])]))
+             [_      #f])]))
 
 (define-match-expander R
   (syntax-rules ()
@@ -93,24 +97,22 @@
       [= #t]
       [> (member? b v cmp)])]))
 
-(define members
-  (match-lambda
-    [(L)
-     empty]
-    [(N _ a x b)
-     (append (members a) (list x) (members b))]))
+(define-match members
+  [(L)
+   empty]
+  [(N _ a x b)
+   (append (members a) (list x) (members b))])
 
-(define balance
-  (match-lambda
-    [(or (B (R (R a x b) y c) z d)
-         (B (R a x (R b y c)) z d)
-         (B a x (R (R b y c) z d))
-         (B a x (R b y (R c z d))))
-     (R (B a x b) y (B c z d))]
-    [(or (BB (R a x (R b y c)) z d)
-         (BB a x (R (R b y c) z d)))
-     (B (B a x b) y (B c z d))]
-    [t t]))
+(define-match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))]
+  [(or (BB (R a x (R b y c)) z d)
+       (BB a x (R (R b y c) z d)))
+   (B (B a x b) y (B c z d))]
+  [t t])
 
 (define (insert t v cmp)
   (define (ins t v cmp)
@@ -125,50 +127,44 @@
         [> (balance (N c a x (ins b v cmp)))])]))
   (blacken (ins t v cmp)))
 
-(define min
-  (match-lambda
-    [(L) (error 'min "empty tree")]
-    [(N _ (L) x _) x]
-    [(N _ a _ _) (min a)]))
+(define-match min
+  [(L) (error 'min "empty tree")]
+  [(N _ (L) x _) x]
+  [(N _ a _ _) (min a)])
 
-(define -B
-  (match-lambda
-    [(L2) (L)]
-    [(BB a x b) (B a x b)]
-    [a (error '-B "unsupported node ~a" a)]))
+(define-match -B
+  [(BB) (L)]
+  [(BB a x b) (B a x b)]
+  [a (error '-B "unsupported node ~a" a)])
 
-(define rotate
-  (match-lambda
-    [(R (BB? a) x (B b y c))
-     (balance (B (R (-B a) x b) y c))]
-    [(R (B a x b) y (BB? c))
-     (balance (B a x (R b y (-B c))))]
-    
-    [(B (BB? a) x (B b y c))
-     (balance (BB (R (-B a) x b) y c))]
-    [(B (B a x b) y (BB? c))
-     (balance (BB a x (R b y (-B c))))]
-    
-    [(B (BB? a) x (R (B b y c) z (B? d)))
-     (B (balance (B (R (-B a) x b) y c)) z d)]
-    [(B (R (B? a) x (B b y c)) z (BB? d))
-     (B a x (balance (B b y (R c z (-B d)))))]
-    
-    [t t]))
+(define-match rotate
+  [(R (BB? a) x (B b y c))
+   (balance (B (R (-B a) x b) y c))]
+  [(R (B a x b) y (BB? c))
+   (balance (B a x (R b y (-B c))))]
+  
+  [(B (BB? a) x (B b y c))
+   (balance (BB (R (-B a) x b) y c))]
+  [(B (B a x b) y (BB? c))
+   (balance (BB a x (R b y (-B c))))]
+  
+  [(B (BB? a) x (R (B b y c) z (B? d)))
+   (B (balance (B (R (-B a) x b) y c)) z d)]
+  [(B (R (B? a) x (B b y c)) z (BB? d))
+   (B a x (balance (B b y (R c z (-B d)))))]
+  
+  [t t])
 
-(define blacken
-  (match-lambda
-    [(R (R? a) x b)
-     (B a x b)]
-    [(R a x (R? b))
-     (B a x b)]
-    [t t]))
+(define-match blacken
+  [(or (R (R? a) x b)
+       (R a x (R? b)))
+   (B a x b)]
+  [t t])
 
-(define redden
-  (match-lambda
-    [(B (B? a) x (B? b))
-     (R a x b)]
-    [t t]))
+(define-match redden
+  [(B (B? a) x (B? b))
+   (R a x b)]
+  [t t])
 
 (define (delete t v cmp)
   (define (del t v cmp)
@@ -192,14 +188,13 @@
 (module+ benchmark
   (require racket/set)
   
-  (define min-del
-    (match-lambda
-      [(L) (error 'min-del "empty tree")]
-      [(R (L) x (L)) (values x (L))]
-      [(B (L) x (L)) (values x (L2))]
-      [(B (L) x (R a y b)) (values x (B a y b))]
-      [(N c a x b) (let-values ([(v a) (min-del a)])
-                     (values v (rotate (N c a x b))))]))
+  (define-match min-del
+    [(L) (error 'min-del "empty tree")]
+    [(R (L) x (L)) (values x (L))]
+    [(B (L) x (L)) (values x (L2))]
+    [(B (L) x (R a y b)) (values x (B a y b))]
+    [(N c a x b) (let-values ([(v a) (min-del a)])
+                   (values v (rotate (N c a x b))))])
   
   (define (min/delete t)
     (min-del (redden t)))
@@ -313,29 +308,27 @@
   (require racket/port
            racket/set)
   
-  (define local-invariant?
-    (match-lambda
-      [(L) #t]
-      [(R a _ b)
-       (and (B? a)
-            (B? b)
-            (local-invariant? a)
-            (local-invariant? b))]
-      [(B a _ b)
-       (and (local-invariant? a)
-            (local-invariant? b))]))
+  (define-match local-invariant?
+    [(L) #t]
+    [(R a _ b)
+     (and (B? a)
+          (B? b)
+          (local-invariant? a)
+          (local-invariant? b))]
+    [(B a _ b)
+     (and (local-invariant? a)
+          (local-invariant? b))])
   
-  (define global-invariant?
-    (match-lambda
-      [(L) 1]
-      [(N c a _ b)
-       (let ([a-length (global-invariant? a)]
-             [b-length (global-invariant? b)])
-         (and a-length
-              b-length
-              (= a-length b-length)
-              (+ a-length (if (eq? c 'B) 1 0))))]
-      [_ #f]))
+  (define-match global-invariant?
+    [(L) 1]
+    [(N c a _ b)
+     (let ([a-length (global-invariant? a)]
+           [b-length (global-invariant? b)])
+       (and a-length
+            b-length
+            (= a-length b-length)
+            (+ a-length (if (eq? c 'B) 1 0))))]
+    [_ #f])
   
   (define (ordered? t)
     (let ([xs (members t)])
@@ -724,10 +717,10 @@
   
   (render (tree (B (L) "x" (R "a" "y" "b")))
           "black-red-right-subtree-unbounded")
-
+  
   (render (tree (B (L) "x" (R (L) "y" (L))))
           "black-red-right-subtree-bounded")
-
+  
   (render (tree (R (L) "x" (B "a" "y" "b")))
           "red-black-right-subtree")
   
@@ -787,6 +780,6 @@
   
   (render (tree (B (B "a" "x" "b") "y" (B "c" "z" "d")))
           "two-cases-extended-resolved")
-
+  
   (render (tree (BB (L) "k" (BB (L) "x" (BB (L) "y" "..."))))
           "right-cascade"))
