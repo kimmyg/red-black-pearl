@@ -191,7 +191,7 @@
   (define-match min-del
     [(L) (error 'min-del "empty tree")]
     [(R (L) x (L)) (values x (L))]
-    [(B (L) x (L)) (values x (L2))]
+    [(B (L) x (L)) (values x (BB))]
     [(B (L) x (R a y b)) (values x (B a y b))]
     [(N c a x b) (let-values ([(v a) (min-del a)])
                    (values v (rotate (N c a x b))))])
@@ -535,7 +535,7 @@
   
   (define dx
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (* 3/8 unit)]
       [(label _)
        (* 3/8 unit)]
@@ -548,7 +548,7 @@
   
   (define dy
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (* 3/4 unit)]
       [(label _)
        (* 3/4 unit)]
@@ -596,7 +596,7 @@
     (define (render-leaf l ctx)
       (let ([fill-color (fill-color (match l
                                       [(L)  'B]
-                                      [(L2) 'BB]))])
+                                      [(BB) 'BB]))])
         (send ctx set-pen outline-color outline-width 'solid)
         (send ctx set-brush fill-color 'solid)
         (send ctx draw-ellipse (- (/ leaf-width 2)) (- (/ leaf-height 2)) leaf-width leaf-height)))
@@ -609,7 +609,7 @@
         (send ctx draw-text l (- (/ width 2)) (- (/ (- height descender-height) 2)))))
     (define (render-tree-inner t ctx)
       (match t
-        [(or (L) (L2))
+        [(or (L) (BB))
          (render-leaf t ctx)]
         [(label l)
          (render-label l ctx)]
@@ -649,7 +649,7 @@
   
   (define width-tree-left
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
@@ -662,7 +662,7 @@
   
   (define width-tree-right
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
@@ -678,7 +678,7 @@
   
   (define height-tree-top
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (/ leaf-height 2)]
       [(label _)
        (/ leaf-height 2)]
@@ -689,7 +689,7 @@
   
   (define height-tree-bottom
     (match-lambda
-      [(or (L) (L2))
+      [(or (L) (BB))
        (/ leaf-height 2)]
       [(label _)
        (/ leaf-height 2)]
@@ -748,12 +748,12 @@
   (render (tree (BB "a" "x" "b"))
           "double-black-tree")
   
-  (render (tree (L2))
+  (render (tree (BB))
           "double-black-leaf")
   
   (render (hc-append 16 (list (tree (B (L) "k" (L)))
                               arrow
-                              (tree (L2))))
+                              (tree (BB))))
           "single-black-step")
   
   (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
