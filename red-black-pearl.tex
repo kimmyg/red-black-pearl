@@ -28,7 +28,7 @@
 \maketitle
 
 \begin{abstract}
-Red-black trees were born in the imperative world and only adopted into the functional. Okasaki's exposition of the simplicity of a functional implementation actually felt more like a rebirth than mere adoption. With this regime shift came a shift in focus: the energy that would otherwise have been spent on pointer manipulation is now applied to establishing correctness with formal methods--a step forward, to be sure--but one wonders if there is a simple, obviously-correct, functional delete. Indeed there is.
+Red-black trees were properly introduced into the functional world when Okasaki gave an intuitive method for element insertion. Since then, deletion has remained complex, requiring formal methods or advanced type systems to support. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -57,6 +57,8 @@ These conditions guarantee that the longest path from root to leaf can be no mor
 there hasn't been a satisfactory method to delete items; enforced with types leads to Byzantine code, proven correct is good if the language is a target for extraction, but above the capabilities of typical programmers
 
 we've encountered this situation before: Okasaki gave a functional rendition of tree insertion and a smashing intuition at the same time. the intuition, from which the code can be derived, is what we're after: we want a fairly simple, obviously correct way to perform tree deletion.
+
+THREE THINGS TO REASON ABOUT: ORDERING, LOCAL, GLOBAL
 
 INSERTION
 
@@ -155,7 +157,6 @@ As a case for the \texttt{delete} function, this can be written
 [(L) (L)]
 \end{verbatim}
 
-
 \item Because red nodes do not contribute to the height of the tree, we can soundly remove them from the bottom. Therefore, a single red node becomes the empty tree.
 \begin{center}
 \includegraphics{single-red-step.pdf}
@@ -184,7 +185,7 @@ Conceptually, we are only removing a single red node from the tree. Absent subtr
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. Thus, the careless excision of it would violate the global property. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color of which both branches
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. Thus, the careless excision of it would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\texttt{BB}) of which both branches
 \begin{center}
 \includegraphics{double-black-tree.pdf}
 \end{center}
@@ -199,10 +200,175 @@ can be classified. For accounting purposes, a double-black node contributes two 
 
 \end{itemize}
 
+Of course, once this substitution is made, we no longer have a red-black tree, and must reconcile our newly-created tree with the red-black properties. Having adopted Okasaki's initial approach, it seems only natural to apply the rest of it, if possible.
+
+Recall that \texttt{insert} adds a red node to the tree, possibly introducing a red-red violation, and that \texttt{balance} resolves red-red violations locally, possibly introducing one higher in the tree. Because \texttt{insert} is recursive, it can apply \texttt{balance} at each level, pulling red-red violations to the root where they can be resolved unequivocally.
+
+We now find wisdom in formulating \texttt{delete} recursively, as we can apply the same strategy. Instead of introducing red-red violations to be resolved by \texttt{balance}, we introduce double-black nodes to be discharged by \texttt{rotate}.
+
+Our \texttt{delete} is now defined as
+\begin{verbatim}
+(define (delete t k)
+  (match t
+    [(L) (L)]
+    [(R (L) (== v) (L)) (L)]
+    [(B (L) (== v) (L)) (BB)]
+    [(B (R a x b) (== v) (L)) (B a x b)]
+    [(N c a x b)
+     (switch-compare
+       (k x)
+       [< (rotate (N c (delete a k) x b))]
+       [= (let ([v (min-element b)])
+            (rotate (N c a v (delete b k))))]
+       [> (rotate (N c a x (delete b k)))])]))
+\end{verbatim}
+with \texttt{rotate} still undefined.
+
+The \texttt{rotate} function rearranges trees whose root node has a double-black child and either discharges the double-black node immediately or moves it to the root of the tree. Surprisingly, it need only be applied to three cases and their reflections.
+
+The first case is a red-rooted tree with a double-black child. This condition is sufficient to conclude that the other child is black--not red--and is a node--not a leaf. In this case, the double black node can be discharged immediately with the rotation
+\begin{center}
+\includegraphics{BB-R-B.pdf}
+\end{center}
+We can verify that the number of black nodes this tree contributes to each path through it is unchanged by this rotation, so it doesn't disrupt the global property. However, it possibly introduces a red-red violation. Fortunately, this is no matter: we can \texttt{balance} it away! As a case for the \texttt{rotate} function, we can express the rotation of this case and its reflection by
+\begin{verbatim}
+[(R (BB? a) x (B b y c))
+ (balance (B (R (-B a) x b) y c))]
+[(R (B a x b) y (BB? c))
+ (balance (B a x (R b y (-B c))))]
+\end{verbatim}
+where \texttt{BB?} matches a double-black node or leaf without deconstructing it and \texttt{-B} demotes a double-black node or leaf to its black counterpart and is undefined for red nodes.
+
+The second case is a black-rooted tree with a double-black child and a black child, necessarily a node. The situation is identical to the previous case but for the additional black node contributed by the root to each path.
+
+This additional black node prevents us from discharging the double-black node immediately so we defer its resolution by arranging it at the root.
+\begin{center}
+\includegraphics{BB-B-B.pdf}
+\end{center}
+As cases for the \texttt{rotate} function, this is
+\begin{verbatim}
+[(B (BB? a) x (B b y c))
+ (balance (BB (R (-B a) x b) y c))]
+[(B (B a x b) y (BB? c))
+ (balance (BB a x (R b y (-B c))))]
+\end{verbatim}
+This rotation presents a minor complication: because of its double-black root, the red-red violation can no longer be handled by \texttt{balance}. We cope with this by extending \texttt{balance} over just these situations. This is as simple as adding cases for trees of the form
+\begin{center}
+\includegraphics{two-cases-extended.pdf}
+\end{center}
+and transforming them each to
+\begin{center}
+\includegraphics{two-cases-extended-resolved.pdf}
+\end{center}
+Unlike the original cases of \texttt{balance}, there is no way that this transformation can introduce a red-red violation; it doesn't introduce any red nodes! In fact, the need to balance is almost preferable here since the operation itself would discharge the double-black node!
+
+The third and final case is a black-rooted tree with a double-black child and a red child, necessarily a node.
+\begin{center}
+\includegraphics{BB-B-R.pdf}
+\end{center}
+It is hopeless to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \texttt{balance}, and height adjustments modulo \texttt{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Considering these also gives us just enough to satisfy all the constraints:
+\begin{center}
+\includegraphics{BB-B-R-B-B.pdf}
+\end{center}
+Once again, the introduction of a red-red violation is a possibility, only this time, it is deeper in the tree. We balance where it could occur, noting that a balance could not introduce another red-red violation here, so we need not handle the possibility. As cases for the \texttt{rotate} function, this is expressed by
+\begin{verbatim}
+[(B (BB? a) x (R (B b y c) z (B? d)))
+ (B (balance (B (R (-B a) x b) y c)) z d)]
+[(B (R (B? a) x (B b y c)) z (BB? d))
+ (B a x (balance (B b y (R c z (-B d)))))]
+\end{verbatim}
+
+We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require a minor intrusion into the \emph{blacken} function, but we opt for a different approach. Recall that the final step of \texttt{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \texttt{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
+In doing so, he overcame one deficiency and exposed another: the delete operation. Multiple strategies have been developed to offer the delete operation, but each has its own weakness.
+
+\begin{verbatim}
+(define/match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))]
+  [(or (BB (R (R a x b) y c) z d)
+       (BB (R a x (R b y c)) z d)
+       (BB a x (R (R b y c) z d))
+       (BB a x (R b y (R c z d))))
+   (B (B a x b) y (B c z d))]
+  [t t])
+\end{verbatim}
+
+\begin{verbatim}
+(define min
+  (match-lambda
+    [(L) (error 'min "empty tree")]
+    [(N _ (L) x _) x]
+    [(N _ a _ _) (min a)]))
+
+(define -B
+  (match-lambda
+    [(L2) (L)]
+    [(BB a x b) (B a x b)]
+    [a (error '-B "unsupported node ~a" a)]))
+
+(define rotate
+  (match-lambda
+    [(R (BB? a) x (B b y c))
+     (balance (B (R (-B a) x b) y c))]
+    [(R (B a x b) y (BB? c))
+     (balance (B a x (R b y (-B c))))]
+    
+    [(B (BB? a) x (B b y c))
+     (balance (BB (R (-B a) x b) y c))]
+    [(B (B a x b) y (BB? c))
+     (balance (BB a x (R b y (-B c))))]
+    
+    [(B (BB? a) x (R (B b y c) z (B? d)))
+     (B (balance (B (R (-B a) x b) y c)) z d)]
+    [(B (R (B? a) x (B b y c)) z (BB? d))
+     (B a x (balance (B b y (R c z (-B d)))))]
+    
+    [t t]))
+
+(define blacken
+  (match-lambda
+    [(R (R? a) x b)
+     (B a x b)]
+    [(R a x (R? b))
+     (B a x b)]
+    [t t]))
+
+(define redden
+  (match-lambda
+    [(B (B? a) x (B? b))
+     (R a x b)]
+    [t t]))
+
+(define (delete t v cmp)
+  (define (del t v cmp)
+    (match t
+      [(L) (L)]
+      [(R (L) (== v) (L))
+       (L)]
+      [(B (L) (== v) (L))
+       (BB)]
+      [(B (R a x b) (== v) (L))
+       (B a x b)]
+      [(N c a x b)
+       (switch-compare
+        (cmp v x)
+        [< (rotate (N c (del a v cmp) x b))]
+        [= (let ([v (min b)])
+             (rotate (N c a v (del b v cmp))))]
+        [> (rotate (N c a x (del b v cmp)))])]))
+  (del (redden t) v cmp))
+\end{verbatim}
 
 WHEN TALKING ABOUT WHY WE DON'T SPECIAL CASE THE RIGHT TREE STUFF
 
-After the initial, each invocation of \texttt{delete} targets the minimum value of the given tree. This entails traversing to the leftmost node of the tree and recurring on its right subtree, only bottoming out when it lacks one. In an unrestricted binary search tree, this approach recurs on the entire tree in the worst case! Fortunately, the restrictions of red-black trees impose a tight bound on this its maximum recursion depth when applied to them. Specifically, the global property ensures that the right subtree of
+We have, seemingly for the sake of simplicity, omitted the black-rooted tree with a red-rooted right subtree as a base case of the \texttt{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \texttt{delete} on
+\begin{center}
+\includegraphics{right-cascade.pdf}
+\end{center}
+with and without this base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \texttt{delete}. Specifically, the global property ensures that the right subtree of
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
@@ -215,9 +381,6 @@ and that
 \includegraphics{red-black-right-subtree.pdf}
 \end{center}
 cannot occur. This limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point.
-
-
-go over base cases, ending in black. this case is difficult because the removal of a black node alters the height of the tree--the number of black nodes in this path--and so violates the global property.
 
 following the wisdom of Okasaki, we will take the approach of maintaining the global property at the expense of the local. we do this by temporarily introducing a double black node into the tree for accounting purposes. considering a local portion of the tree, we perform tree rotations in an attempt to discharge the black node. there are only three cases, with their reflections.
 
@@ -299,107 +462,11 @@ In the same way that we consider leaf nodes to be black, we consider double-blac
 
 The presence of a double-black child node indicates the need for a rotation operation. In some cases, the rotation can discharge the double-black node, and no further rotations will be made. In others, the local structure of the tree prevents resolution in its scope, and the double-black node is pushed higher to be treated by another rotation occurring higher in the tree.
 
-We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a single-black node once at the root. This would require a minor intrusion of concerns into the \emph{blacken} function, but is fortunately unnecessary. [Recall that] the first step of the deletion algorithm is to redden the root if possible, and that, if it's not possible, the root must have a red child. This is sufficient to guarantee that a double-black node, if it reaches the top, can be discharged there by the natural flow of the algorithm; no exceptions need be made.
 
-In doing so, he overcame one deficiency and exposed another: the delete operation. Multiple strategies have been developed to offer the delete operation, but each has its own weakness.
 
 Suppose we have a basic implementation of a red-black tree in a language that supports variants and pattern matching. Following Okasaki \cite{okasaki1999functional}, such an implementation might look like this:
 
-\begin{center}
-\includegraphics{BB-R-B.pdf}
-\end{center}
-\begin{center}
-\includegraphics{BB-B-B.pdf}
-\end{center}
-\begin{center}
-\includegraphics{four-cases-extended.pdf}
-\end{center}
-\begin{center}
-\includegraphics{four-cases-extended-resolved.pdf}
-\end{center}
-\begin{center}
-\includegraphics{BB-B-R.pdf}
-\end{center}
-\begin{verbatim}
-(define/match balance
-  [(or (B (R (R a x b) y c) z d)
-       (B (R a x (R b y c)) z d)
-       (B a x (R (R b y c) z d))
-       (B a x (R b y (R c z d))))
-   (R (B a x b) y (B c z d))]
-  [(or (BB (R (R a x b) y c) z d)
-       (BB (R a x (R b y c)) z d)
-       (BB a x (R (R b y c) z d))
-       (BB a x (R b y (R c z d))))
-   (B (B a x b) y (B c z d))]
-  [t t])
-\end{verbatim}
 
-\begin{verbatim}
-(define min
-  (match-lambda
-    [(L) (error 'min "empty tree")]
-    [(N _ (L) x _) x]
-    [(N _ a _ _) (min a)]))
-
-(define -B
-  (match-lambda
-    [(L2) (L)]
-    [(BB a x b) (B a x b)]
-    [a (error '-B "unsupported node ~a" a)]))
-
-(define rotate
-  (match-lambda
-    [(R (BB? a) x (B b y c))
-     (balance (B (R (-B a) x b) y c))]
-    [(R (B a x b) y (BB? c))
-     (balance (B a x (R b y (-B c))))]
-    
-    [(B (BB? a) x (B b y c))
-     (balance (BB (R (-B a) x b) y c))]
-    [(B (B a x b) y (BB? c))
-     (balance (BB a x (R b y (-B c))))]
-    
-    [(B (BB? a) x (R (B b y c) z (B? d)))
-     (B (balance (B (R (-B a) x b) y c)) z d)]
-    [(B (R (B? a) x (B b y c)) z (BB? d))
-     (B a x (balance (B b y (R c z (-B d)))))]
-    
-    [t t]))
-
-(define blacken
-  (match-lambda
-    [(R (R? a) x b)
-     (B a x b)]
-    [(R a x (R? b))
-     (B a x b)]
-    [t t]))
-
-(define redden
-  (match-lambda
-    [(B (B? a) x (B? b))
-     (R a x b)]
-    [t t]))
-
-(define (delete t v cmp)
-  (define (del t v cmp)
-    (match t
-      [(L) (L)]
-      [(R (L) (== v) (L))
-       (L)]
-      [(B (L) (== v) (L))
-       (BB)]
-      [(B (R a x b) (== v) (L))
-       (B a x b)]
-      [(N c a x b)
-       (switch-compare
-        (cmp v x)
-        [< (rotate (N c (del a v cmp) x b))]
-        [= (let ([v (min b)])
-             (rotate (N c a v (del b v cmp))))]
-        [> (rotate (N c a x (del b v cmp)))])]))
-  (del (redden t) v cmp))
-\end{verbatim}
 
 
 

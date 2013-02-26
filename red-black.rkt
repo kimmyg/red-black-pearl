@@ -773,10 +773,13 @@
                               (tree (BB (R (B "a" "x" "b") "y" "c") "z" "d"))))
           "BB-B-B")
   
+  (render (tree (B (BB "a" "x" "b") "y" (R "c" "z" "d")))
+          "BB-B-R")
+  
   (render (hc-append 16 (list (tree (B (BB "a" "v" "b") "w" (R (B "c" "x" "d") (cons #t "y") (B "e" "z" "f"))))
                               arrow
                               (tree (B (B (R (B "a" "v" "b") "w" "c") "x" "d") "y" (B "e" "z" "f")))))
-          "BB-B-R")
+          "BB-B-R-B-B")
   
   (render (hc-append 16 (list (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
                               (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))))
