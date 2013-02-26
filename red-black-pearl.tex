@@ -54,19 +54,17 @@ and the global property that
 \end{enumerate}
 These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of the location of an element in a red-black tree operation is a reasonable constant factor over that of a a perfectly balanced tree.
 
-Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers and to go without if their functional language lacks one.
+Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers or to go without if their functional language lacks one.
 
-This situation should seem familiar. Before Okasaki's functional treatment, insertion in red-black trees suffered the same impenetrability. However, in addition to introducing a functional treatment of tree insertion, Okasaki succeeded in adding intuition to something considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
+This situation should seem familiar. Before Okasaki's functional treatment, insertion in red-black trees suffered the same impenetrability. However, success may not lie solely in provision. In addition to providing a functional treatment, Okasaki succeeded in adding intuition to something considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
 
 We aim to democratize deletion in a similar way by providing a method that is intuitive, succinct, and obviously correct.
 
 As an example to introduce our rigorous yet informal reasoning methods, we briefly review Okasaki's functional insertion.
 
-THREE THINGS TO REASON ABOUT: ORDERING, LOCAL, GLOBAL
-
 \section{Insertion}
 
-Okasaki \cite{okasaki1999functional} accomplished insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
+Okasaki accomplished insertion by means of the recursive \texttt{insert} function and the \texttt{balance} helper function.
 
 Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
 \begin{verbatim}
@@ -82,7 +80,7 @@ Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express t
 \end{verbatim}
 where \texttt{balance} yet remains undefined.
 
-This definition of \texttt{insert} unilaterally colors each newly-added node red, but this may create a problem: if the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is achieved by the \texttt{balance} function which takes trees of one of the following four forms
+This definition of \texttt{insert} unilaterally colors each newly-added node red, but this may create a problem: if the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is achieved by the \texttt{balance} function which takes trees of one of the forms of
 \begin{center}
 \includegraphics{four-cases.pdf}
 \end{center}
@@ -100,13 +98,13 @@ Expressed in code, this is equally concise:
    (R (B a x b) y (B c z d))])
 \end{verbatim}
 
-In order to verify that we are not beguiled by the elegance of this transformation, we need to ensure that is has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
+In order to verify that we are not beguiled by the elegance of this transformation, we need to ensure that it has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
 
 It is routine to verify that this transformation preserves a correct tree ordering, but no less important for it. We will say little about order preservation, but it is critical to verify for each transformation we introduce.
 
 Next, we verify that this transformation doesn't introduce any red-red violations unduly. It clearly resolves the red-red violation of its design, but we must consider any introductions of the same. We observe that, below this section of the tree, the subtrees $a$, $b$, $c$, ande $d$ are compatible with their newly-assigned parents, no matter the colorings of their roots. However, consider the parent of this section of the tree. If the parent is red, then this transformation \emph{introduces} exactly the same kind of red-red violation it resolved, only further up the tree. It is here that we rely on the recursive nature of \texttt{insert} and the application of \texttt{balance} at each step. We reason inductively that each violation introduced in this way will be handled by the same mechanism.
 
-Finally, we verify the transformation does not introduce any height violations. We do this by ensuring that the number of black nodes this section of the tree contributes to each path through it is the same before and after it occurs. Like the first property, verifying this is routine but nevertheless critical.
+Finally, we verify that the transformation does not introduce any height violations. We do this by ensuring that the number of black nodes this section of the tree contributes to each path through it is the same before and after it occurs. Like the first property, verifying this is routine but nevertheless critical.
 
 The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which is benign in all cases. This requires a small modification of \texttt{insert} to 
 \begin{verbatim}
@@ -131,14 +129,15 @@ with \texttt{blacken} given by
 Our formulation of the red-black invariants allows trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it. This leads only to a change to \texttt{blacken}, which is now
 \begin{verbatim}
 (define/match blacken
-  [(R (R? a) x b) (B a x b)]
-  [(R a x (R? b)) (B a x b)]
+  [(or (R (R? a) x b)
+       (R a x (R? b)))
+   (B a x b)]
   [t t])
 \end{verbatim}
 
 \section{Deletion}
 
-Insertion in binary trees has the advantage that new nodes are added only to the fringe, whereas deletion might also target interior nodes. With deletion, we only have to be slightly clever to reduce the latter situation to the former: when deleting a value that resides in an interior node, replace that node's value with the minimum value of its right subtree, and delete that value from that subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min-element} function for free, which is critical for priority queues.} This strategy contains a reference to deletion itself, so, like insertion, this approach can be defined recursively. Roughly, we express it by
+Insertion in binary trees has the advantage that new nodes are added only to the fringe, whereas deletion might also target interior nodes. With deletion, we only have to be slightly clever to reduce the latter situation to the former: when deleting a value that resides in an interior node, replace that node's value with the minimum value of its right subtree, and delete that value from that subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \texttt{min-element} function for free, which is useful for priority queues.} This strategy contains a reference to deletion itself, so, like insertion, this approach can be defined recursively. Roughly, we express it by
 \begin{verbatim}
 (define (delete t k)
   (match t
@@ -193,7 +192,7 @@ Conceptually, we are only removing a single red node from the tree. Absent subtr
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one for the node itself and one for the leaf. Thus, the careless excision of it would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\texttt{BB}) of which both branches
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of it would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\texttt{BB}) of which both branches
 \begin{center}
 \includegraphics{double-black-tree.pdf}
 \end{center}
@@ -201,7 +200,7 @@ and leaves
 \begin{center}
 \includegraphics{double-black-leaf.pdf}
 \end{center}
-can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion. 
+can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion:
 \begin{center}
 \includegraphics{single-black-step.pdf}
 \end{center}
@@ -245,11 +244,9 @@ We can verify that the number of black nodes this tree contributes to each path 
 [(R (B a x b) y (BB? c))
  (balance (B a x (R b y (-B c))))]
 \end{verbatim}
-where \texttt{BB?} matches a double-black node or leaf without deconstructing it and \texttt{-B} demotes a double-black node or leaf to its black counterpart and is undefined for red nodes.
+where \texttt{BB?} matches a double-black node or leaf without deconstructing it and \texttt{-B} demotes a double-black node or leaf to its black counterpart (and is undefined on red nodes).
 
-The second case is a black-rooted tree with a double-black child and a black child, necessarily a node. The situation is identical to the previous case but for the additional black node contributed by the root to each path.
-
-This additional black node prevents us from discharging the double-black node immediately so we defer its resolution by arranging it at the root.
+The second case is a black-rooted tree with a double-black child and a black child, necessarily a node. The situation is identical to the previous case but for the additional black node contributed by the root to each path. This additional black node prevents us from discharging the double-black node immediately so we defer its resolution by arranging it at the root.
 \begin{center}
 \includegraphics{BB-B-B.pdf}
 \end{center}
@@ -274,7 +271,7 @@ The third and final case is a black-rooted tree with a double-black child and a 
 \begin{center}
 \includegraphics{BB-B-R.pdf}
 \end{center}
-It is hopeless to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \texttt{balance}, and height adjustments modulo \texttt{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Considering these also gives us just enough to satisfy all the constraints:
+It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \texttt{balance}, and height adjustments modulo \texttt{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Considering these also gives us just enough to satisfy all the constraints:
 \begin{center}
 \includegraphics{BB-B-R-B-B.pdf}
 \end{center}
@@ -501,14 +498,14 @@ Suppose we have a basic implementation of a red-black tree in a language that su
 
 
 
-\appendix
-\section{Appendix Title}
+%\appendix
+%\section{Appendix Title}
 
-This is the text of the appendix, if you need one.
+%This is the text of the appendix, if you need one.
 
-\acks
+%\acks
 
-Acknowledgments, if needed.
+%Acknowledgments, if needed.
 
 % We recommend abbrvnat bibliography style.
 
@@ -517,13 +514,13 @@ Acknowledgments, if needed.
 
 % The bibliography should be embedded for final submission.
 
-\begin{thebibliography}{}
-\softraggedright
+%\begin{thebibliography}{}
+%\softraggedright
 
-\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
-P. Q. Smith, and X. Y. Jones. ...reference text...
+%\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+%P. Q. Smith, and X. Y. Jones. ...reference text...
 
-\end{thebibliography}
+%\end{thebibliography}
 
 \end{document}
 
