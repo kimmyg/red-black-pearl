@@ -13,3 +13,6 @@ benchmark:
 
 diagram:
 	raco test --submodule diagram red-black.rkt
+
+clean:
+	rm *.aux *.bbl *.blg *.log *.pdf
