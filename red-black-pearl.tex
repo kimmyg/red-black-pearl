@@ -80,7 +80,7 @@ Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express t
 \end{verbatim}
 where \texttt{balance} yet remains undefined.
 
-This definition of \texttt{insert} unilaterally colors each newly-added node red, but this may create a problem: if the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is achieved by the \texttt{balance} function which takes trees of one of the forms of
+This definition of \texttt{insert} unilaterally colors each newly-added node red, but this may create a problem: if the parent of this new node is red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of the local property than the global one. This is achieved by the \texttt{balance} function which takes trees of one of the forms
 \begin{center}
 \includegraphics{four-cases.pdf}
 \end{center}
@@ -183,7 +183,7 @@ violates the global property and cannot occur.
 \begin{center}
 \includegraphics{black-red-left-subtree-step.pdf}
 \end{center}
-Conceptually, we are only removing a single red node from the tree. Absent subtree merging, this is completely straightforward. As a case for the \texttt{delete} function, this is
+Conceptually, we are only removing a single red node from the tree, which--absent subtree merging--is completely straightforward. As a case for the \texttt{delete} function, this is
 \begin{verbatim}
 [(B (R a x b) (== k) (L)) (B a x b)]
 \end{verbatim}
@@ -192,7 +192,7 @@ Conceptually, we are only removing a single red node from the tree. Absent subtr
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of it would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\texttt{BB}) of which both branches
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of the node would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\texttt{BB}) of which both branches
 \begin{center}
 \includegraphics{double-black-tree.pdf}
 \end{center}
@@ -200,7 +200,7 @@ and leaves
 \begin{center}
 \includegraphics{double-black-leaf.pdf}
 \end{center}
-can be classified. For accounting purposes, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion:
+can be classified. When accounting, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion:
 \begin{center}
 \includegraphics{single-black-step.pdf}
 \end{center}
@@ -261,11 +261,11 @@ This rotation presents a minor complication: because of its double-black root, t
 \begin{center}
 \includegraphics{two-cases-extended.pdf}
 \end{center}
-and transforming each of them to
+and transforming them to
 \begin{center}
 \includegraphics{two-cases-extended-resolved.pdf}
 \end{center}
-Unlike the original cases of \texttt{balance}, there is no way that this transformation can introduce a red-red violation; it doesn't introduce any red nodes! In fact, the need to balance is almost preferable here since the operation itself would discharge the double-black node!
+Unlike the original cases of \texttt{balance}, there is no way that this transformation can introduce a red-red violation: it doesn't introduce any red nodes! In fact, the need to balance is almost preferable here since the operation itself would discharge the double-black node!
 
 The third and final case is a black-rooted tree with a double-black child and a red child, necessarily a node.
 \begin{center}
@@ -283,7 +283,7 @@ Once again, the introduction of a red-red violation is a possibility, only this 
  (B a x (balance (B b y (R c z (-B d)))))]
 \end{verbatim}
 
-We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \texttt{blacken} function to the transient double-black color, but in the interest of double-black containment, we opt for a different approach. Recall that the final step of \texttt{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \texttt{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
+We might ask whether a double black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \texttt{blacken} function to the transient double-black color, but, in the interest of double-black containment, we opt for a different approach. Recall that the final step of \texttt{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \texttt{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
 
 With proper syntax in hand, the essence of this algorithm is incredibly succinct.
 
@@ -388,7 +388,7 @@ We have, seemingly for the sake of simplicity, omitted the black-rooted tree wit
 \begin{center}
 \includegraphics{right-cascade.pdf}
 \end{center}
-with and without this base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \texttt{delete}. Specifically, the global property ensures that
+with and without a similar uncolored base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \texttt{delete}. Specifically, the global property ensures that
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
