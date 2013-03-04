@@ -218,6 +218,11 @@
           [> (rotate (N c a x (del b v cmp)))])]))
     (del (redden t) v cmp))
   
+  (define root-value
+    (match-lambda
+      [(L) (error 'root-value "empty tree")]
+      [(N _ _ x _) x]))
+  
   (define-syntax-rule (time body ...)
     (begin
       (collect-garbage)
@@ -238,7 +243,20 @@
   
   (displayln "comparing two implementations of delete")
   
-  (displayln "deletion")
+  (displayln "aggregate deletion time")
+  (for ([i 20])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)]
+           [t (insert* empty-tree < xs)])
+      (let ([imp1-time (time
+                        (for ([x xs])
+                          (delete t x <)))]
+            [imp2-time (time
+                        (for ([x xs])
+                          (delete-alt t x <)))])
+        (printf "size ~a, standard ~ams, alternate ~ams~n" n imp1-time imp2-time))))
+  
+  (displayln "deletion time without replacement")
   (for ([i 20])
     (let* ([n (expt 2 (add1 i))]
            [xs (random-list n n)]
@@ -250,6 +268,20 @@
             [imp2-time (time
                         (for/fold ([t t])
                           ([x xs])
+                          (delete-alt t x <)))])
+        (printf "size ~a, standard ~ams, alternate ~ams~n" n imp1-time imp2-time))))
+  
+  (displayln "root deletion time")
+  (for ([i 20])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)]
+           [t (insert* empty-tree < xs)]
+           [x (root-value t)])
+      (let ([imp1-time (time
+                        (for ([j n])
+                          (delete t x <)))]
+            [imp2-time (time
+                        (for ([j n])
                           (delete-alt t x <)))])
         (printf "size ~a, standard ~ams, alternate ~ams~n" n imp1-time imp2-time))))
   
@@ -269,7 +301,21 @@
                          (insert t x <)))])
         (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
   
-  (displayln "deletion")
+  (displayln "deletion with replacement")
+  (for ([i 20])
+    (let* ([n (expt 2 (add1 i))]
+           [xs (random-list n n)]
+           [s (apply set xs)]
+           [t (insert* empty-tree < xs)])
+      (let ([set-time (time
+                       (for ([x xs])
+                         (set-remove s x)))]
+            [rbt-time (time
+                       (for ([x xs])
+                         (delete-alt t x <)))])
+        (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
+  
+  (displayln "deletion without replacement")
   (for ([i 20])
     (let* ([n (expt 2 (add1 i))]
            [xs (random-list n n)]
@@ -282,7 +328,7 @@
             [rbt-time (time
                        (for/fold ([t t])
                          ([x xs])
-                         (delete t x <)))])
+                         (delete-alt t x <)))])
         (printf "size ~a, set ~ams, tree ~ams~n" n set-time rbt-time))))
   
   (define (mean-removal-time t)
