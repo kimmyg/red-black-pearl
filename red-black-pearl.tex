@@ -338,8 +338,8 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
     
   [t t])
 
-(define (delete t v cmp)
-  (define (del t v cmp)
+(define (delete t v)
+  (define (del t v)
     (match t
       [(L) (L)]
       [(R (L) (== v) (L))
@@ -351,14 +351,38 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
       [(N c a x b)
        (switch-compare
         (cmp v x)
-        [< (rotate (N c (del a v cmp) x b))]
+        [< (rotate (N c (del a v) x b))]
         [= (let ([v (min b)])
-             (rotate (N c a v (del b v cmp))))]
-        [> (rotate (N c a x (del b v cmp)))])]))
-  (del (redden t) v cmp))
+             (rotate (N c a v (del b v))))]
+        [> (rotate (N c a x (del b v)))])]))
+  (del (redden t) v))
 \end{verbatim}
 
-\section{More}
+\section{Time Complexity}
+
+We can readily see that this approach can attain logarithmic time complexity, the best we can hope for. However, the details of our implementation may contribute constant penalties.
+
+To start, consider what happens when the value to delete is located in an interior node. First, the left edge of its right child is traversed to obtain a replacement value. That value is then deleted from the right child, causing another traversal. This is costliest when the value to delete is found in the root node; in this case, the depth of the tree is traversed twice. We can remove this extraneous traversal with \texttt{min-del} which returns the minimum value and deletes it, causing only one traversal.
+\begin{verbatim}
+(define-match min-del
+  [(L) (error 'min-del "empty tree")]
+  [(R (L) x (L)) (values x (L))]
+  [(B (L) x (L)) (values x (BB))]
+  [(B (L) x (R a y b)) (values x (B a y b))]
+  [(N c a x b) (let-values ([(v a) (min-del a)])
+                 (values v (rotate (N c a x b))))])
+\end{verbatim}
+We also replace one clause in the \texttt{delete} function to use this.
+\begin{verbatim}
+[= (let-values ([(v b) (min-del b)])
+     (rotate (N c a v b)))]
+\end{verbatim}
+
+What's more, this function is especially useful for priority queues, and needs only a small wrapper to be usable.
+\begin{verbatim}
+  (define (min/delete t)
+    (min-del (redden t)))
+\end{verbatim}
 
 We have, seemingly for the sake of simplicity, omitted the black-rooted tree with a red-rooted right subtree as a base case of the \texttt{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \texttt{delete} on
 \begin{center}
