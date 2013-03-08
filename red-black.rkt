@@ -792,7 +792,7 @@
        (height-tree-bottom t)))
   
   (define right-> (right-arrow 32 2 16 3))
-  (define down-> (down-arrow 8 4 8 4))
+  (define down-> (down-arrow 12 6 12 6))
   
   #;(render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
                               (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
