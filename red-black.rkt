@@ -499,7 +499,9 @@
   (struct renderable () #:transparent)
   (struct tree renderable (tree) #:transparent)
   (struct hc-append renderable (gap renderables) #:transparent)
+  (struct vc-append renderable (gap renderables) #:transparent)
   (struct right-arrow renderable (body-length body-half-width head-length head-extent) #:transparent)
+  (struct down-arrow renderable (body-length body-half-width head-length head-extent) #:transparent)
   
   (define width
     (match-lambda
@@ -508,8 +510,12 @@
       [(hc-append gap rs)
        (+ (apply + (map width rs))
           (* gap (sub1 (length rs))))]
+      [(vc-append gap rs)
+       (apply max (map width rs))]
       [(right-arrow bl _ hl _)
-       (+ bl hl)]))
+       (+ bl hl)]
+      [(down-arrow _ bw _ he)
+       (* (+ he bw) 2)]))
   
   (define height
     (match-lambda
@@ -517,8 +523,13 @@
        (height-tree t)]
       [(hc-append _ rs)
        (apply max (map height rs))]
+      [(vc-append gap rs)
+       (+ (apply + (map height rs))
+          (* gap (sub1 (length rs))))]
       [(right-arrow _ bhw _ e)
-       (* 2 (+ bhw e))]))
+       (* 2 (+ bhw e))]
+      [(down-arrow bl _ hl _)
+       (+ bl hl)]))
   
   (define outline-color "black")
   (define outline-width 2)
@@ -544,6 +555,21 @@
                                   (send ctx translate x-offset 0)
                                   (go rs (+ acc x-offset))))))])
              (go rs 0)))]
+        [(vc-append gap rs)
+         (let ([w (width r)])
+           (letrec ([go (λ (rs acc)
+                          (if (empty? rs)
+                              (send ctx translate 0 (- acc))
+                              (let ([r (first rs)]
+                                    [rs (rest rs)])
+                                (let ([x-offset (/ (- w (width r)) 2)]
+                                      [y-offset (+ (height r) gap)])
+                                  (send ctx translate x-offset 0)
+                                  (render-inner r ctx)
+                                  (send ctx translate (- x-offset) 0)
+                                  (send ctx translate 0 y-offset)
+                                  (go rs (+ acc y-offset))))))])
+             (go rs 0)))]
         [(right-arrow bl bhw hl he)
          (let ([outline (new dc-path%)])
            (send outline move-to 0 (+ he bhw))
@@ -555,6 +581,21 @@
            (send outline line-to bl (+ he (* 2 bhw)))
            (send outline line-to 0 (+ he (* 2 bhw)))
            (send outline line-to 0 (+ he bhw))
+           (send outline close)
+           (send ctx set-pen "black" 0 'transparent)
+           (send ctx set-brush "black" 'solid)
+           (send ctx draw-path outline))]
+        [(down-arrow bl bhw hl he)
+         (let ([outline (new dc-path%)])
+           (send outline move-to (+ he bhw) 0)
+           (send outline line-to he 0)
+           (send outline line-to he bl)
+           (send outline line-to 0 bl)
+           (send outline line-to (+ he bhw) (+ bl hl))
+           (send outline line-to (* 2 (+ he bhw)) bl)
+           (send outline line-to (+ he (* 2 bhw)) bl)
+           (send outline line-to (+ he (* 2 bhw)) 0)
+           (send outline line-to (+ he bhw) 0)
            (send outline close)
            (send ctx set-pen "black" 0 'transparent)
            (send ctx set-brush "black" 'solid)
@@ -750,16 +791,25 @@
     (+ (height-tree-top t)
        (height-tree-bottom t)))
   
-  (define arrow (right-arrow 32 2 16 3))
+  (define right-> (right-arrow 32 2 16 3))
+  (define down-> (down-arrow 8 4 8 4))
   
-  (render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
+  #;(render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
                               (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
                               (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
                               (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
           "four-cases")
   
-  (render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
+  #;(render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
           "four-cases-resolved")
+  
+  (render (vc-append 16 (list (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
+                                                  (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                                                  (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
+                                                  (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
+                              down->
+                              (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))))
+          "balance")
   
   (render (tree (B (L) "x" (R "a" "y" "b")))
           "black-red-right-subtree-unbounded")
@@ -771,12 +821,12 @@
           "red-black-right-subtree")
   
   (render (hc-append 16 (list (tree (L))
-                              arrow
+                              right->
                               (tree (L))))
           "empty-step")
   
   (render (hc-append 16 (list (tree (R (L) "k" (L)))
-                              arrow
+                              right->
                               (tree (L))))
           "single-red-step")
   
@@ -784,7 +834,7 @@
           "red-black-left-subtree")
   
   (render (hc-append 16 (list (tree (B (R "a" "x" "b") "k" (L)))
-                              arrow
+                              right->
                               (tree (B "a" "x" "b"))))
           "black-red-left-subtree-step")
   
@@ -798,17 +848,17 @@
           "double-black-leaf")
   
   (render (hc-append 16 (list (tree (B (L) "k" (L)))
-                              arrow
+                              right->
                               (tree (BB))))
           "single-black-step")
   
   (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
-                              arrow
+                              right->
                               (tree (B (R (B "a" "x" "b") "y" "c") "z" "d"))))
           "BB-R-B")
   
   (render (hc-append 16 (list (tree (B (BB "a" "x" "b") "y" (B "c" "z" "d")))
-                              arrow
+                              right->
                               (tree (BB (R (B "a" "x" "b") "y" "c") "z" "d"))))
           "BB-B-B")
   
@@ -816,7 +866,7 @@
           "BB-B-R")
   
   (render (hc-append 16 (list (tree (B (BB "a" "v" "b") "w" (R (B "c" "x" "d") (cons #t "y") (B "e" "z" "f"))))
-                              arrow
+                              right->
                               (tree (B (B (R (B "a" "v" "b") "w" "c") "x" "d") "y" (B "e" "z" "f")))))
           "BB-B-R-B-B")
   

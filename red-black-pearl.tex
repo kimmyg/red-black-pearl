@@ -66,14 +66,16 @@ As an example to introduce rigorous yet informal methods to reason about correct
 
 Insertion of a value into a red-black tree begins as its insertion in an unrestricted binary tree would: the tree is searched in typical recursive fashion for the value. If the value is encountered, the insertion is unnecessary and the tree is unchanged. If not, the search concludes at a leaf whose location is precisely where the value should be inserted. This sentinel leaf is replaced by a node containing the value.
 
-To account for the red-black properties, Okasaki's method unilaterally colors this newly-added node red. If this node's parent is also red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of a local property than the global one. His method achieves this by \emph{balancing} the part of the tree local to the new node. The process of balancing rearranges trees of one of the forms
+To account for the red-black properties, Okasaki's method unilaterally colors this newly-added node red. If this node's parent is also red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of a local property than the global one. His method achieves this by \emph{balancing} the part of the tree local to the new node. The process of balancing rearranges trees according to figure \ref{fig:balance}.
+
+\begin{figure}
+\label{fig:balance}
 \begin{center}
-\includegraphics{four-cases.pdf}
+\includegraphics{balance.pdf}
 \end{center}
-into
-\begin{center}
-\includegraphics{four-cases-resolved.pdf}
-\end{center}
+\caption{The act of balancing}
+\end{figure}
+
 If the parent of this subtree is itself red, this process introduces another local violation higher in the tree. This violation can be handled in the same way by preemptively balancing the tree as the search recedes. As each violation is introduced, the balance operation resolves it and possibly introduces another closer to the root, only to be handled by a balance there. 
 
 Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
