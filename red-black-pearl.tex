@@ -41,7 +41,7 @@ red-black tree, delete, data structure
 
 \section{Introduction}
 
-When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary search tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension.
+When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension.
 
 The usefulness of red-black trees stems from their balanced nature. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the local property that
 \begin{enumerate}
@@ -76,7 +76,7 @@ To account for the red-black properties, Okasaki's method unilaterally colors th
 \caption{The act of balancing}
 \end{figure}
 
-If the parent of this subtree is itself red, this process introduces another local violation higher in the tree. This violation can be handled in the same way by preemptively balancing the tree as the search recedes. As each violation is introduced, the balance operation resolves it and possibly introduces another closer to the root, only to be handled by a balance there. 
+If the parent of a balanced subtree is itself red, this maneuver introduces another local violation higher in the tree. This violation can be handled in the same way by preemptively balancing the tree as the search recedes. As each violation is introduced, the balance operation resolves it and possibly introduces another closer to the root, only to be handled by a balance there. 
 
 Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express the \texttt{insert}\footnote{We use the variable \texttt{k} to denote the value to insert to avoid later confusion.} function with
 \begin{verbatim}
@@ -100,7 +100,7 @@ where \texttt{balance} is defined by
    (R (B a x b) y (B c z d))])
 \end{verbatim}
 
-In order to verify that we are not beguiled by the elegance of \texttt{balance}, we need to ensure that it has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
+In order to verify that we are not beguiled by the elegance of \texttt{balance}, we need to ensure that the transformation it performs has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
 
 It is routine to verify that this transformation preserves a correct tree ordering, but no less important for it. We will say little about order preservation, but it is critical to verify for each transformation we introduce.
 
@@ -108,7 +108,7 @@ Next, we verify that this transformation doesn't introduce any red-red violation
 
 Finally, we verify that the transformation does not introduce any height violations. We do this by ensuring that the number of black nodes this section of the tree contributes to each path through it is the same before and after it occurs. Like the first property, verifying this is routine but nevertheless critical.
 
-The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which may resolve a red-red violation outside the scope of \texttt{balance} and is benign in all other cases. This requires a small modification of \texttt{insert} to 
+The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which may resolve a red-red violation outside the scope of \texttt{balance} and is benign otherwise. This requires a small modification of \texttt{insert} to 
 \begin{verbatim}
 (define (insert t k)
   (define (ins t k)
@@ -148,7 +148,7 @@ Insertion into binary trees has the advantage that new nodes are added only to t
        (k x)
        [< (N c (delete a k) x b)]
        [= (let ([v (min-element b)])
-            (N c a v (delete b k)))]
+            (N c a v (delete b v)))]
        [> (N c a x (delete b k))])]))
 \end{verbatim}
 Essentially, this algorithm first locates the given value with a simple binary search and then applies our strategy, invoking itself. By enhancing this approach to account for red-black properties, we obtain a sound, persistent method of deletion from red-black trees!
@@ -227,7 +227,7 @@ Our \texttt{delete} function is now defined as
      (switch-compare
        (k x)
        [< (rotate (N c (delete a k) x b))]
-       [= (let ([v (min-element b)])
+       [= (let ([k (min-element b)])
             (rotate (N c a v (delete b k))))]
        [> (rotate (N c a x (delete b k)))])]))
 \end{verbatim}
@@ -354,15 +354,17 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
        (switch-compare
         (cmp v x)
         [< (rotate (N c (del a v) x b))]
-        [= (let ([v (min b)])
-             (rotate (N c a v (del b v))))]
+        [= (let ([k (min-element b)])
+             (rotate (N c a v (del b k))))]
         [> (rotate (N c a x (del b v)))])]))
   (del (redden t) v))
 \end{verbatim}
 
-\section{Time Complexity}
+\section{Efficiency}
 
-We can readily see that this approach can attain logarithmic time complexity, the best we can hope for. However, the details of our implementation may contribute constant penalties.
+\subsection{Time Complexity}
+
+We can readily see that this approach can attain logarithmic time complexity, the best we can hope for asymptotically. However, the details of our implementation may contribute constant penalties.
 
 To start, consider what happens when the value to delete is located in an interior node. First, the left edge of its right child is traversed to obtain a replacement value. That value is then deleted from the right child, causing another traversal. This is costliest when the value to delete is found in the root node; in this case, the depth of the tree is traversed twice. We can remove this extraneous traversal with \texttt{min-del} which returns the minimum value and deletes it, causing only one traversal.
 \begin{verbatim}
@@ -371,8 +373,8 @@ To start, consider what happens when the value to delete is located in an interi
   [(R (L) x (L)) (values x (L))]
   [(B (L) x (L)) (values x (BB))]
   [(B (L) x (R a y b)) (values x (B a y b))]
-  [(N c a x b) (let-values ([(v a) (min-del a)])
-                 (values v (rotate (N c a x b))))])
+  [(N c a x b) (let-values ([(k a) (min-del a)])
+                 (values k (rotate (N c a x b))))])
 \end{verbatim}
 We also replace one clause in the \texttt{delete} function to use this.
 \begin{verbatim}
@@ -385,6 +387,8 @@ What's more, this function is especially useful for priority queues, and needs o
   (define (min/delete t)
     (min-del (redden t)))
 \end{verbatim}
+
+\subsection{Base Cases}
 
 We have, seemingly for the sake of simplicity, omitted the black-rooted tree with a red-rooted right subtree as a base case of the \texttt{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \texttt{delete} on
 \begin{center}
@@ -406,7 +410,7 @@ cannot occur. This limits the the opportunities for recursion to appear at most 
 
 \section{Conclusion}
 
-Okasaki's contribution was two-fold: he provided an intuitive method to red-black tree insertion and provided a reference implementation in Haskell\cite{hudak1992report}. This choice in language had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \texttt{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we not only invent syntax, but define it in the language. This allows us to execute the exact code used for presentation and avoid strattling the border to pseudocode.
+Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. This choice in language had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \texttt{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we not only invent syntax, but define it in the language. This allows us to execute the exact code used for presentation and avoid straddling the border to pseudocode.
 
 %\acks
 
