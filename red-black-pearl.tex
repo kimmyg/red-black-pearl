@@ -52,7 +52,7 @@ red-black tree, delete, data structure
 
 When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension.
 
-The usefulness of red-black trees stems from their balanced nature. A red-black tree is a binary tree in which each node is colored red or black, and which satisfies the local property that
+The usefulness of red-black trees stems from their balanced nature. A red-black tree is a binary tree in which each node is colored red or black, and whose construction satisfies two properties: the local property that
 \begin{enumerate}
 \item every red node has two black children,
 \end{enumerate}
@@ -61,11 +61,11 @@ and the global property that
 \setcounter{enumi}{1}
 \item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are colored black.} node contains the same number of black nodes.
 \end{enumerate}
-These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), and so the worst-case penalty of locating an element as part of a red-black tree operation is a reasonable constant factor over that of a perfectly balanced tree.
+These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), so the worst-case penalty of locating an element as part of a red-black tree operation is a reasonable constant factor over that of a perfectly balanced tree.
 
-Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers or to go without if their functional language lacks one.
+Red-black trees were properly introduced into the functional world when Okasaki gave a clear, succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers or to go without if their functional language lacks one.
 
-This situation should seem familiar. Before Okasaki's functional treatment, insertion into red-black trees suffered the same impenetrability. However, clarity did not come solely from a reference implementation. In addition to providing a functional treatment, Okasaki succeeded in adding intuition to something considered to be intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
+This situation should seem familiar. Before Okasaki's functional treatment, insertion into red-black trees suffered the same impenetrability. However, clarity did not come solely from a reference implementation. In addition to providing a functional treatment, Okasaki succeeded in adding intuition to something considered intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
 
 We aim to democratize deletion in a similar way by providing a method that is intuitive, succinct, and obviously correct.
 
@@ -282,7 +282,7 @@ The third and final case is a black-rooted tree with a double-black child and a 
 \begin{center}
 \includegraphics{BB-B-R.pdf}
 \end{center}
-It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \scheme{balance}, and height adjustments modulo \scheme{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. The inclusion of the inner child in our consideration gives us just enough to satisfy all the constraints:
+It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \scheme{balance}, and height adjustments modulo \scheme{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Including the inner child in our consideration gives us just enough to satisfy all the constraints:
 \begin{center}
 \includegraphics{BB-B-R-B.pdf}
 \end{center}
@@ -332,21 +332,22 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
   [a (error '-B "not applicable to ~a" a)])
 
 (define-match rotate
+  ; first case
   [(R (BB? a-x-b) y (B c z d))
    (balance (B (R (-B a-x-b) y c) z d))]
   [(R (B a x b) y (BB? c-z-d))
    (balance (B a x (R b y (-B c-z-d))))]
-  
+  ; second case
   [(B (BB? a-x-b) y (B c z d))
    (balance (BB (R (-B a-x-b) y c) z d))]
   [(B (B a x b) y (BB? c-z-d))
    (balance (BB a x (R b y (-B c-z-d))))]
-  
+  ; third case
   [(B (BB? a-w-b) x (R (B c y d) z e))
    (B (balance (B (R (-B a-w-b) x c) y d)) z e)]
   [(B (R a w (B b x c)) y (BB? d-z-e))
    (B a w (balance (B b x (R c y (-B d-z-e)))))]
-  
+  ; fall through
   [t t])
 
 (define (delete t v)
