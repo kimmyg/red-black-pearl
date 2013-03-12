@@ -138,20 +138,20 @@
   [a (error '-B "unsupported node ~a" a)])
 
 (define-match rotate
-  [(R (BB? a) x (B b y c))
-   (balance (B (R (-B a) x b) y c))]
-  [(R (B a x b) y (BB? c))
-   (balance (B a x (R b y (-B c))))]
+  [(R (BB? a-x-b) y (B c z d))
+   (balance (B (R (-B a-x-b) y c) z d))]
+  [(R (B a x b) y (BB? c-z-d))
+   (balance (B a x (R b y (-B c-z-d))))]
   
-  [(B (BB? a) x (B b y c))
-   (balance (BB (R (-B a) x b) y c))]
-  [(B (B a x b) y (BB? c))
-   (balance (BB a x (R b y (-B c))))]
+  [(B (BB? a-x-b) y (B c z d))
+   (balance (BB (R (-B a-x-b) y c) z d))]
+  [(B (B a x b) y (BB? c-z-d))
+   (balance (BB a x (R b y (-B c-z-d))))]
   
-  [(B (BB? a) x (R (B b y c) z (B? d)))
-   (B (balance (B (R (-B a) x b) y c)) z d)]
-  [(B (R (B? a) x (B b y c)) z (BB? d))
-   (B a x (balance (B b y (R c z (-B d)))))]
+  [(B (BB? a-w-b) x (R (B c y d) z e))
+   (B (balance (B (R (-B a-w-b) x c) y d)) z e)]
+  [(B (R a w (B b x c)) y (BB? d-z-e))
+   (B a w (balance (B b x (R c y (-B d-z-e)))))]
   
   [t t])
 
@@ -865,10 +865,10 @@
   (render (tree (B (BB "a" "x" "b") "y" (R "c" "z" "d")))
           "BB-B-R")
   
-  (render (hc-append 16 (list (tree (B (BB "a" "v" "b") "w" (R (B "c" "x" "d") (cons #t "y") (B "e" "z" "f"))))
+  (render (hc-append 16 (list (tree (B (BB "a" "w" "b") "x" (R (B "c" "y" "d") (cons #t "z") "e")))
                               right->
-                              (tree (B (B (R (B "a" "v" "b") "w" "c") "x" "d") "y" (B "e" "z" "f")))))
-          "BB-B-R-B-B")
+                              (tree (B (B (R (B "a" "w" "b") "x" "c") "y" "d") "z" "e"))))
+          "BB-B-R-B")
   
   (render (hc-append 16 (list (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
                               (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))))
