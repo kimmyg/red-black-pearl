@@ -33,7 +33,7 @@
 \rightcodeskip=0pt plus 1fil 
 
 \begin{abstract}
-Red-black trees were properly introduced into the functional world when Okasaki gave a succinct method of element insertion. Even still, deletion has remained complex, requiring the consideration of a litany of rebalancing cases and contingencies. With such conceptual impenetrability, it's no wonder that authors have turned to advanced type systems and formal methods to ensure correctness. This has relegated workaday functional programmers to be mere implementation consumers. We aim to democratize deletion by providing a method that is intuitive, succinct, and obviously correct.
+Functional deletion from red-black trees has remained complex with many approaches relying on advanced type systems or formal methods to ensure correctness. The inscrutability of persistent deletion prohibits workaday functional programmers from implementing red-black trees in their chosen language, despite the great utility red-black trees possess, forcing them to rely on ecosystem of their particular language. In the spirit of Okasaki, we aim to democratize persistent deletion from red-black trees by providing a method that is intuitive, succinct, and obviously correct. This intuition should not only convince the common functional program that the method works, it should also allow them to implement it themselves.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -437,7 +437,7 @@ Nevertheless, by including a case for it, we avoid the second recursive step.
 
 \section{Conclusion}
 
-Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. This choice in language had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we not only invent syntax, but define it in the language. This allows us to execute the exact code used for presentation and avoid straddling the border to pseudocode.
+Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. This choice in language had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we not only invent syntax, but extend the language with it. This allows us to execute the exact code used for presentation and avoid straddling the border to pseudocode.
 
 %\acks
 
