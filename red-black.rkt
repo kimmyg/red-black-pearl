@@ -847,7 +847,7 @@
   (render (tree (BB))
           "double-black-leaf")
   
-  (render (hc-append 16 (list (tree (B (L) "k" (L)))
+  (render (hc-append 16 (list (tree (B (L) "v" (L)))
                               right->
                               (tree (BB))))
           "single-black-step")

@@ -132,7 +132,6 @@ with \scheme{blacken} given by
 (define-match blacken
   [(N _ a x b) (N 'B a x b)])
 \end{schemedisplay}
-
 Our formulation of the red-black invariants allows trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it. This leads only to a change to \scheme{blacken}, which is now
 \begin{schemedisplay}
 (define-match blacken
@@ -158,7 +157,7 @@ Insertion into binary trees has the advantage that new nodes are added only to t
 \end{schemedisplay}
 Essentially, this algorithm first locates the given value with a simple binary search and then applies our strategy, invoking itself. By enhancing this approach to account for red-black properties, we obtain a sound, persistent method of deletion from red-black trees!
 
-We start by considering the genuine base cases of the delete algorithm: the configurations that don't entail a node with a right subtree from which we can extract the minimum element.
+We start by considering the genuine base cases of the delete algorithm, the configurations that don't entail a node with a right subtree from which we can extract the minimum element.
 
 \begin{itemize}
 
@@ -199,7 +198,7 @@ Conceptually, we are only removing a single red node from the tree, which--absen
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of the node would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\scheme{BB}) of which both branches
+presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of the node would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\scheme{BB}) of which both nodes
 \begin{center}
 \includegraphics{double-black-tree.pdf}
 \end{center}
@@ -381,13 +380,9 @@ With proper syntax in hand, the essence of this algorithm, seen in figure \ref{f
 
 \section{Efficiency}
 
-Once we have established the correctness of our approach, we should consider its efficiency. Within this, our first concern is the complexity class of the algorithm at large. When we are satisfied with our complexity class, we can aim to reduce the constant factor.
+Once we have established the correctness of our approach, we should consider its efficiency. We can readily see that this approach can attain logarithmic time complexity, the best for which we can hope asymptotically. However, various aspects of our implementation contribute constant penalties.
 
-\subsection{Time Complexity}
-
-We can readily see that this approach can attain logarithmic time complexity, the best we can hope for asymptotically. However, the details of our implementation may contribute constant penalties.
-
-To start, consider what happens when the value to delete is located in an interior node. First, the left edge of its right child is traversed to obtain a replacement value. That value is then deleted from the right child, causing another traversal. This is costliest when the value to delete is found in the root node; in this case, the depth of the tree is traversed twice. We can remove this extraneous traversal with \scheme{min-del} which returns the minimum value and deletes it, causing only one traversal.
+To identify a particularly egregious aspect, consider what happens when the value to delete is located in an interior node. First, the left edge of its right child is traversed to obtain a replacement value. That value is then deleted from the right child, causing another traversal. This is costliest when the value to delete is found in the root node; in this case, the depth of the entire tree is traversed twice. We can remove this extraneous traversal with \scheme{min-del} which returns the minimum value and deletes it in only one traversal.
 \begin{schemedisplay}
 (define-match min-del
   [(L) (error 'min-del "empty tree")]
@@ -402,28 +397,21 @@ We also replace one clause in the \scheme{delete} function to use this.
 [= (let-values ([(v b) (min-del b)])
      (rotate (N c a v b)))]
 \end{schemedisplay}
-
-What's more, this function is especially useful for priority queues, and needs only a small wrapper to be usable.
+In addition, this function is especially useful for priority queues, and needs only a small wrapper to be usable.
 \begin{schemedisplay}
   (define (min/delete t)
     (min-del (redden t)))
 \end{schemedisplay}
 
-\subsection{Constant Factor}
-
-Okasaki suggests that by specializing \scheme{balance}, we can speed up the algorithm. Brevity aside, there is little reason \emph{not} to take this advice since we can dismiss half of the \scheme{balance} cases before it is even invoked. We can do something similar for \scheme{rotate}.
-
-If, in the course of locating a node, the search recurs on the left child, then a double-black node can only appear in its place, and we can invoke a \scheme{rotate} specialized to only those cases. 
-
-We have, seemingly for the sake of simplicity, omitted the black-rooted tree with a red-rooted right subtree as a base case of the \scheme{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \scheme{delete} on
-\begin{center}
-\includegraphics{right-cascade.pdf}
-\end{center}
-with and without a similar uncolored base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \scheme{delete}. Specifically, the global property ensures that
+The next aspect we consider our criteria for a case to be considered ``base''. We have, seemingly for the sake of simplicity, omitted
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
-is at worst
+as a base case of the \scheme{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \scheme{delete} on
+\begin{center}
+\includegraphics{right-cascade.pdf}
+\end{center}
+with and without a similar uncolored base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \scheme{delete}. Specifically, the global property ensures that this case is at worst
 \begin{center}
 \includegraphics{black-red-right-subtree-bounded.pdf}
 \end{center}
@@ -431,9 +419,9 @@ and that
 \begin{center}
 \includegraphics{red-black-right-subtree.pdf}
 \end{center}
-cannot occur. This limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point.
+cannot occur. This restriction limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point. Nevertheless, if we include a case for it, we avoid the second recursive step.
 
-Nevertheless, by including a case for it, we avoid the second recursive step.
+Finally, we consider the pattern-matching aspect of our algorithm. Okasaki suggests that specializing \scheme{balance} speeds up insertion by avoiding matching against patterns that it is known will fail. Implementation brevity aside, there is little reason \emph{not} to take this advice since we can dismiss half of the \scheme{balance} cases before it is even invoked. We can do something similar for \scheme{rotate}. If, in the course of locating a node, the search recurs on the left child, then a double-black node can appear only in its place, and we can invoke a \scheme{rotate} specialized to only those cases.
 
 \section{Conclusion}
 
