@@ -7,6 +7,7 @@
 % authoryear    To obtain author/year citation style instead of numeric.
 
 \usepackage{slatex}
+\usepackage{subcaption}
 \usepackage{graphicx}
 
 \begin{document}
@@ -26,11 +27,6 @@
            %{Email2/3}
 
 \maketitle
-
-% POSSIBLE CHANGES TO MAKE
-% introduce syntax as needed and more thoroughly (but it should be obvious)
-% state that the double black node could be a node or a leaf, show it in a diagram?
-% introduce the case in the obvious way and then condense it?
 
 \setkeyword{define-match match switch-compare let-values}
 \setkeyword{L N R R? B B? BB BB?}
@@ -248,7 +244,7 @@ The first case is a red-rooted tree with a double-black child. This condition is
 \begin{center}
 \includegraphics{BB-R-B.pdf}
 \end{center}
-We can verify that the number of black nodes this tree contributes to each path through it is unchanged by this rotation, so it doesn't disrupt the global property. However, it possibly introduces a red-red violation. Fortunately, this is no matter: we can \scheme{balance} it away! As a case for the \scheme{rotate} function, we can express the rotation of this case and its reflection by
+We can verify that the number of black nodes this tree contributes to each path through it is unchanged by this rotation, so it doesn't disrupt the global property. However, it possibly introduces a red-red violation. Fortunately, this is no matter: we can \scheme{balance} it away! If we do so, we don't need to worry about introducing another red-red violation--akin to \scheme{insert}--since the root of this section of the tree was red originally. As a case for the \scheme{rotate} function, we can express the rotation of this case and its reflection by
 \begin{schemedisplay}
 [(R (BB? a-x-b) y (B c z d))
  (balance (B (R (-B a-x-b) y c) z d))]
@@ -278,59 +274,10 @@ and transforming them to
 \end{center}
 Unlike the original cases of \scheme{balance}, there is no way that this transformation can introduce a red-red violation: it doesn't introduce any red nodes! In fact, the need to balance is almost preferable here since the operation itself would discharge the double-black node!
 
-The third and final case is a black-rooted tree with a double-black child and a red child, necessarily a node.
-\begin{center}
-\includegraphics{BB-B-R.pdf}
-\end{center}
-It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \scheme{balance}, and height adjustments modulo \scheme{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Including the inner child in our consideration gives us just enough to satisfy all the constraints:
-\begin{center}
-\includegraphics{BB-B-R-B.pdf}
-\end{center}
-Once again, the introduction of a red-red violation is a possibility, only this time, it is deeper in the tree. We balance where it could occur, noting that a balance could not introduce another red-red violation here, so we need not handle the possibility. As cases for the \scheme{rotate} function, this is expressed by
+\begin{figure*}
+\centering
+\begin{subfigure}[t]{0.33\textwidth}
 \begin{schemedisplay}
-[(B (BB? a-w-b) x (R (B c y d) z e))
- (B (balance (B (R (-B a-w-b) x c) y d)) z e)]
-[(B (R a w (B b x c)) y (BB? d-z-e))
- (B a w (balance (B b x (R c y (-B d-z-e)))))]
-\end{schemedisplay}
-
-We might ask whether a double-black node will reach the top before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \scheme{blacken} function to the transient double-black color, but, in the interest of double-black containment, we opt for a different approach. Recall that the final step of \scheme{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \scheme{delete} is to redden the root if possible. If it can be reddened, then the full tree will fall under the first case and a double-black node can be discharged at the top. If it cannot be reddened, then at least one of its children is red. If the value to be deleted is found in the red-rooted subtree, the first case of rotation applies to the subtree. If not, the third case of rotation applies to the entire tree. Thus, in no case can a double-black node reach the root. [Make this structured and not a block of text?]
-
-With proper syntax in hand, the essence of this algorithm is incredibly succinct.
-
-\begin{schemedisplay}
-(define-match blacken
-  [(or (R (R? a) x b)
-       (R a x (R? b)))
-   (B a x b)]
-  [t t])
-
-(define-match redden
-  [(B (B? a) x (B? b))
-   (R a x b)]
-  [t t])
-
-(define-match min
-  [(N _ (L) x _) x]
-  [(N _ a _ _) (min a)]
-  [(L) (error 'min "empty tree")])
-
-(define-match balance
-  [(or (B (R (R a x b) y c) z d)
-       (B (R a x (R b y c)) z d)
-       (B a x (R (R b y c) z d))
-       (B a x (R b y (R c z d))))
-   (R (B a x b) y (B c z d))]
-  [(or (BB (R a x (R b y c)) z d)
-       (BB a x (R (R b y c) z d)))
-   (B (B a x b) y (B c z d))]
-  [t t])
-
-(define-match -B
-  [(BB) (L)]
-  [(BB a x b) (B a x b)]
-  [a (error '-B "not applicable to ~a" a)])
-
 (define-match rotate
   ; first case
   [(R (BB? a-x-b) y (B c z d))
@@ -350,6 +297,15 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
   ; fall through
   [t t])
 
+(define-match blacken
+  [(or (R (R? a) x b)
+       (R a x (R? b)))
+   (B a x b)]
+  [t t])
+\end{schemedisplay}
+\end{subfigure}%
+\begin{subfigure}[t]{0.33\textwidth}
+\begin{schemedisplay}
 (define (delete t v)
   (define (del t v)
     (match t
@@ -368,9 +324,64 @@ With proper syntax in hand, the essence of this algorithm is incredibly succinct
              (rotate (N c a v (del b v))))]
         [> (rotate (N c a x (del b v)))])]))
   (del (redden t) v))
+
+(define-match redden
+  [(B (B? a) x (B? b))
+   (R a x b)]
+  [t t])
+\end{schemedisplay}
+\end{subfigure}%
+\begin{subfigure}[t]{0.33\textwidth}
+\begin{schemedisplay}
+(define-match balance
+  [(or (B (R (R a x b) y c) z d)
+       (B (R a x (R b y c)) z d)
+       (B a x (R (R b y c) z d))
+       (B a x (R b y (R c z d))))
+   (R (B a x b) y (B c z d))]
+  [(or (BB (R a x (R b y c)) z d)
+       (BB a x (R (R b y c) z d)))
+   (B (B a x b) y (B c z d))]
+  [t t])
+
+(define-match min
+  [(N _ (L) x _) x]
+  [(N _ a _ _) (min a)]
+  [(L) (error 'min "empty tree")])
+
+(define-match -B
+  [(BB) (L)]
+  [(BB a x b) (B a x b)]
+  [a (error '-B "not applicable to ~a" a)])
+\end{schemedisplay}
+\end{subfigure}
+\caption{The essence of the \emph{delete} implementation}
+\label{fig:implementation}
+\end{figure*}
+
+The third and final case is a black-rooted tree with a double-black child and a red child, necessarily a node.
+\begin{center}
+\includegraphics{BB-B-R.pdf}
+\end{center}
+It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \scheme{balance}, and height adjustments modulo \scheme{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Including the inner child in our consideration gives us just enough to satisfy all the constraints:
+\begin{center}
+\includegraphics{BB-B-R-B.pdf}
+\end{center}
+Once again, the introduction of a red-red violation is a possibility, only this time, it is deeper in the tree. We balance where it could occur, noting that a balance could not introduce another red-red violation here, so no provisions are necessary for it. As cases for the \scheme{rotate} function, this is expressed by
+\begin{schemedisplay}
+[(B (BB? a-w-b) x (R (B c y d) z e))
+ (B (balance (B (R (-B a-w-b) x c) y d)) z e)]
+[(B (R a w (B b x c)) y (BB? d-z-e))
+ (B a w (balance (B b x (R c y (-B d-z-e)))))]
 \end{schemedisplay}
 
+We might ask whether a double-black node will reach the root before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \scheme{blacken} function to the transient double-black color, but, in the interest of double-black containment, we opt for a different approach. Recall that the final step of \scheme{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \scheme{delete} is to redden the root if possible. This ensures that, if \scheme{rotate} applies to the root, it will be a case with a red node. Every case of \scheme{rotate} with a red node discharges the double-black node, so a node so-colored will never reach the root.
+
+With proper syntax in hand, the essence of this algorithm, seen in figure \ref{fig:implementation}, is incredibly succinct.
+
 \section{Efficiency}
+
+Once we have established the correctness of our approach, we should consider its efficiency. Within this, our first concern is the complexity class of the algorithm at large. When we are satisfied with our complexity class, we can aim to reduce the constant factor.
 
 \subsection{Time Complexity}
 
@@ -398,7 +409,11 @@ What's more, this function is especially useful for priority queues, and needs o
     (min-del (redden t)))
 \end{schemedisplay}
 
-\subsection{Base Cases}
+\subsection{Constant Factor}
+
+Okasaki suggests that by specializing \scheme{balance}, we can speed up the algorithm. Brevity aside, there is little reason \emph{not} to take this advice since we can dismiss half of the \scheme{balance} cases before it is even invoked. We can do something similar for \scheme{rotate}.
+
+If, in the course of locating a node, the search recurs on the left child, then a double-black node can only appear in its place, and we can invoke a \scheme{rotate} specialized to only those cases. 
 
 We have, seemingly for the sake of simplicity, omitted the black-rooted tree with a red-rooted right subtree as a base case of the \scheme{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \scheme{delete} on
 \begin{center}
@@ -417,6 +432,8 @@ and that
 \includegraphics{red-black-right-subtree.pdf}
 \end{center}
 cannot occur. This limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point.
+
+Nevertheless, by including a case for it, we avoid the second recursive step.
 
 \section{Conclusion}
 

@@ -825,20 +825,20 @@
                               (tree (L))))
           "empty-step")
   
-  (render (hc-append 16 (list (tree (R (L) "k" (L)))
+  (render (hc-append 16 (list (tree (R (L) "v" (L)))
                               right->
                               (tree (L))))
           "single-red-step")
   
-  (render (tree (R (B "a" "x" "b") "k" (L)))
+  (render (tree (R (B "a" "x" "b") "v" (L)))
           "red-black-left-subtree")
   
-  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "k" (L)))
+  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "v" (L)))
                               right->
                               (tree (B "a" "x" "b"))))
           "black-red-left-subtree-step")
   
-  (render (tree (B (L) "k" (L)))
+  (render (tree (B (L) "v" (L)))
           "single-black")
   
   (render (tree (BB "a" "x" "b"))
@@ -877,5 +877,5 @@
   (render (tree (B (B "a" "x" "b") "y" (B "c" "z" "d")))
           "two-cases-extended-resolved")
   
-  (render (tree (BB (L) "k" (BB (L) "x" (BB (L) "y" "..."))))
+  (render (tree (BB (L) "v" (BB (L) "x" (BB (L) "y" "..."))))
           "right-cascade"))
