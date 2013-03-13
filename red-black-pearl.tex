@@ -33,7 +33,7 @@
 \rightcodeskip=0pt plus 1fil 
 
 \begin{abstract}
-Functional deletion from red-black trees has remained complex with many approaches relying on advanced type systems or formal methods to ensure correctness. The inscrutability of persistent deletion prohibits workaday functional programmers from implementing red-black trees in their chosen language, despite the great utility red-black trees possess, forcing them to rely on ecosystem of their particular language. In the spirit of Okasaki, we aim to democratize persistent deletion from red-black trees by providing a method that is intuitive, succinct, and obviously correct. This intuition should not only convince the common functional program that the method works, it should also allow them to implement it themselves.
+Functional deletion from red-black trees has remained complex with many approaches relying on advanced type systems or formal methods to ensure correctness. The inscrutability of persistent deletion prohibits workaday functional programmers from implementing red-black trees in their chosen language, despite the great utility red-black trees possess. They are left at the mercy of the ecosystem of their particular language. In the spirit of Okasaki, we aim to democratize persistent deletion from red-black trees by providing a method that is intuitive, succinct, and obviously correct. This intuition should not only convince the common functional programmer that the method works, but it should also allow them to implement it themselves.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -389,7 +389,7 @@ To identify a particularly egregious aspect, consider what happens when the valu
   [(R (L) x (L)) (values x (L))]
   [(B (L) x (L)) (values x (BB))]
   [(B (L) x (R a y b)) (values x (B a y b))]
-  [(N c a x b) (let-values ([(k a) (min-del a)])
+  [(N c a x b) (let-values ([(v a) (min-del a)])
                  (values v (rotate (N c a x b))))])
 \end{schemedisplay}
 We also replace one clause in the \scheme{delete} function to use this.
@@ -403,7 +403,7 @@ In addition, this function is especially useful for priority queues, and needs o
     (min-del (redden t)))
 \end{schemedisplay}
 
-The next aspect we consider our criteria for a case to be considered ``base''. We have, seemingly for the sake of simplicity, omitted
+The next aspect we consider is our criteria for a case to be considered ``base''. We have, seemingly for the sake of simplicity, omitted
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
@@ -423,9 +423,11 @@ cannot occur. This restriction limits the the opportunities for recursion to app
 
 Finally, we consider the pattern-matching aspect of our algorithm. Okasaki suggests that specializing \scheme{balance} speeds up insertion by avoiding matching against patterns that it is known will fail. Implementation brevity aside, there is little reason \emph{not} to take this advice since we can dismiss half of the \scheme{balance} cases before it is even invoked. We can do something similar for \scheme{rotate}. If, in the course of locating a node, the search recurs on the left child, then a double-black node can appear only in its place, and we can invoke a \scheme{rotate} specialized to only those cases.
 
+Each of these aspects can be considered singly, if desired, but more important is that each presents itself naturally when the implementation concerns are organized by a good intuition.
+
 \section{Conclusion}
 
-Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. This choice in language had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we not only invent syntax, but extend the language with it. This allows us to execute the exact code used for presentation and avoid straddling the border to pseudocode.
+Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. His language choice had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we can not only invent syntax, but also extend the language with it. This keeps our presentation clear and instructive while making it executable, which allows us to avoid straddling the border to pseudocode.
 
 %\acks
 
