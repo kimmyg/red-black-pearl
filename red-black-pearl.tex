@@ -1,11 +1,11 @@
 \documentclass[preprint]{sigplanconf}
 
 % The following \documentclass options may be useful:
-%
+% % % %
 % 10pt          To set in 10-point type instead of 9-point.
 % 11pt          To set in 11-point type instead of 9-point.
 % authoryear    To obtain author/year citation style instead of numeric.
-
+% 
 \usepackage{slatex}
 \usepackage{subcaption}
 \usepackage{graphicx}
@@ -16,8 +16,9 @@
 \copyrightyear{2013} 
 \copyrightdata{[to be supplied]} 
 
-\titlebanner{Red-Black Tree Deletion}        % These are ignored unless
-\preprintfooter{Presents the missing method of Okasaki's red-black trees.}   % 'preprint' option specified.
+ % These are ignored unless 'preprint' option specified.
+\titlebanner{Red-Black Tree Deletion}
+\preprintfooter{Presents the missing method of Okasaki's red-black trees.}
 
 \title{Deletion: The Curse of the Functional Red-Black Tree}
 \subtitle{Functional Pearl}
@@ -25,7 +26,7 @@
 \authorinfo{Kimball Germane\and Matt Might}
            {University of Utah}
            %{Email2/3}
-
+           
 \maketitle
 
 \setkeyword{define-match match switch-compare let-values}
@@ -33,8 +34,28 @@
 \rightcodeskip=0pt plus 1fil 
 
 \begin{abstract}
-Functional deletion from red-black trees has remained complex with many approaches relying on advanced type systems or formal methods to ensure correctness. The inscrutability of persistent deletion prohibits workaday functional programmers from implementing red-black trees in their chosen language, despite the great utility red-black trees possess. They are left at the mercy of the ecosystem of their particular language. In the spirit of Okasaki, we aim to democratize persistent deletion from red-black trees by providing a method that is intuitive, succinct, and obviously correct. This intuition should not only convince the common functional programmer that the method works, but it should also allow them to implement it themselves.
+Okasaki introduced the canonical implementation of purely functional red-black trees, and every major implementation since has copied his style.
+In his presentation, Okasaki thoroughly develops insertion, yet leaves deletion as a ``straightforward'' exercise to the reader.
+% TODO: Look up the words Okasaki actually used to describe it.
+Kahrs developed a complex deletion method based on Okasaki's approach that focuses on provably preserving red-black invariants within the Haskell type system.
+Many implementationn---even for untyped languages---have copied the Kahrs deletion algorithm.
+Appel recently developed an implementation of red-black trees for Coq that uses a novel (yet still complex) deletion method.
+Our goal is to reveal the missing method: a simple deletion method meant for \emph{human} comprehension.
+To simplify deletion, we introduce a temporary third color, ``double black,'' which significantly simplies the preservation of invariants.
 \end{abstract}
+
+%\begin{abstract}
+%Functional deletion from red-black trees has remained complex with many
+%approaches relying on advanced type systems or formal methods to ensure
+%correctness. The inscrutability of persistent deletion prohibits workaday
+%functional programmers from implementing red-black trees in their chosen
+%language, despite the great utility red-black trees possess. They are left at
+%the mercy of the ecosystem of their particular language. In the spirit of
+%Okasaki, we aim to democratize persistent deletion from red-black trees by
+%providing a method that is intuitive, succinct, and obviously correct. This
+%intuition should not only convince the common functional programmer that the
+%method works, but it should also allow them to implement it themselves.
+%\end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
 
@@ -46,32 +67,76 @@ red-black tree, delete, data structure
 
 \section{Introduction}
 
-When looking for a data structure to back a functional implementation of sets, red-black trees--a type of balanced binary tree--are a natural choice. Common set operations, such as membership testing and persistent addition, map naturally to their native operations of search and insertion. And, speaking of maps, minor modifications can turn a set membership test into a map lookup operation and set addition into map extension.
+When looking for a data structure to back a functional implementation of sets,
+red-black trees--a type of balanced binary tree--are a natural choice. Common
+set operations, such as membership testing and persistent addition, map
+naturally to their native operations of search and insertion. And, speaking of
+maps, minor modifications can turn a set membership test into a map lookup
+operation and set addition into map extension.
 
-The usefulness of red-black trees stems from their balanced nature. A red-black tree is a binary tree in which each node is colored red or black, and whose construction satisfies two properties: the local property that
+The usefulness of red-black trees stems from their balanced nature. A red-black
+tree is a binary tree in which each node is colored red or black, and whose
+construction satisfies two properties: the local property that
 \begin{enumerate}
 \item every red node has two black children,
 \end{enumerate}
 and the global property that
 \begin{enumerate}
 \setcounter{enumi}{1}
-\item every path from the root to a leaf\footnote{For our purposes, leaf nodes do not contain data and are colored black.} node contains the same number of black nodes.
+\item every path from the root to a leaf\footnote{For our purposes, leaf nodes
+do not contain data and are colored black.} node contains the same number of
+black nodes.
 \end{enumerate}
-These conditions guarantee that the longest path from root to leaf can be no more than twice the shortest (the only difference being individual red nodes interspersed along the way), so the worst-case penalty of locating an element as part of a red-black tree operation is a reasonable constant factor over that of a perfectly balanced tree.
+These conditions guarantee that the longest path from root to leaf can be no
+more than twice the shortest (the only difference being individual red nodes
+interspersed along the way), so the worst-case penalty of locating an element as
+part of a red-black tree operation is a reasonable constant factor over that of
+a perfectly balanced tree.
 
-Red-black trees were properly introduced into the functional world when Okasaki gave a clear, succinct method of element insertion \cite{okasaki1999functional}. Even still, deletion has remained complex, requiring the consideration of a litany of cases and contingencies. Because of the lack of an overarching intuition, ensuring correctness has become a burden. To cope with this, authors have turned to advanced type systems \cite{kahrs2001red} and formal methods \cite{appel2011efficient}. The apparent difficulty of bearing the onus of correctness has relegated workaday functional programmers to be mere implementation consumers or to go without if their functional language lacks one.
+Red-black trees were properly introduced into the functional world when Okasaki
+gave a clear, succinct method of element insertion \cite{okasaki1999functional}.
+Even still, deletion has remained complex, requiring the consideration of a
+litany of cases and contingencies. Because of the lack of an overarching
+intuition, ensuring correctness has become a burden. To cope with this, authors
+have turned to advanced type systems \cite{kahrs2001red} and formal methods
+\cite{appel2011efficient}. The apparent difficulty of bearing the onus of
+correctness has relegated workaday functional programmers to be mere
+implementation consumers or to go without if their functional language lacks
+one.
 
-This situation should seem familiar. Before Okasaki's functional treatment, insertion into red-black trees suffered the same impenetrability. However, clarity did not come solely from a reference implementation. In addition to providing a functional treatment, Okasaki succeeded in adding intuition to something considered intricate and error-prone. The net effect of his contribution is not code so short that it is easily memorizable but a concept so elegant and natural that, from it, the code is easily derivable--very befitting of its pearl namesake.
+This situation should seem familiar. Before Okasaki's functional treatment,
+insertion into red-black trees suffered the same impenetrability. One of his
+insights was that the wholesale migration of an algorithm from the imperative to
+the functional world ignores the relative strengths of each. When re-imagined to
+suit its new habitat, Okasaki showed that functional insertion becomes natural
+and elegant. Deletion has not enjoyed such a treatment and functional
+implementations strongly resemble their imperative counterparts--laden with
+special cases--in addition to acquiring functional cruft for correctness' sake.
+The result is a hybrid algorithm well-suited for neither paradigm but
+nevertheless copied verbosely into a variety of implementations. It remains
+inscrutable as ever and unapproachable at large. We aim to democratize
+functional deletion the same way Okasaki did so for insertion: by providing a
+method that is intuitive, succinct, and obviously correct.
 
-We aim to democratize deletion in a similar way by providing a method that is intuitive, succinct, and obviously correct.
-
-As an example to introduce rigorous yet informal methods to reason about correctness, we briefly review Okasaki's functional insertion.
+As an example to introduce rigorous yet informal methods to reason about
+correctness, we briefly review Okasaki's functional insertion.
 
 \section{Insertion}
 
-Insertion of a value into a red-black tree begins as its insertion in an unrestricted binary tree would: the tree is searched in typical recursive fashion for the value. If the value is encountered, the insertion is unnecessary and the tree is unchanged. If not, the search concludes at a leaf whose location is precisely where the value should be inserted. This sentinel leaf is replaced by a node containing the value.
+Insertion of a value into a red-black tree begins as its insertion in an
+unrestricted binary tree would: the tree is searched in typical recursive
+fashion for the value. If the value is encountered, the insertion is unnecessary
+and the tree is unchanged. If not, the search concludes at a leaf whose location
+is precisely where the value should be inserted. This sentinel leaf is replaced
+by a node containing the value.
 
-To account for the red-black properties, Okasaki's method unilaterally colors this newly-added node red. If this node's parent is also red, this action violates the local property. Okasaki persists in the face of this possibility, reasoning that it is easier to resolve a violation of a local property than the global one. His method achieves this by \emph{balancing} the part of the tree local to the new node. The process of balancing rearranges trees according to figure \ref{fig:balance}.
+To account for the red-black properties, Okasaki's method unilaterally colors
+this newly-added node red. If this node's parent is also red, this action
+violates the local property. Okasaki persists in the face of this possibility,
+reasoning that it is easier to resolve a violation of a local property than the
+global one. His method achieves this by \emph{balancing} the part of the tree
+local to the new node. The process of balancing rearranges trees according to
+figure \ref{fig:balance}.
 
 \begin{figure}
 \label{fig:balance}
@@ -81,9 +146,14 @@ To account for the red-black properties, Okasaki's method unilaterally colors th
 \caption{The act of balancing}
 \end{figure}
 
-If the parent of a balanced subtree is itself red, this maneuver introduces another local violation higher in the tree. This violation can be handled in the same way by preemptively balancing the tree as the search recedes. As each violation is introduced, the balance operation resolves it and possibly introduces another closer to the root, only to be handled by a balance there. 
+If the parent of a balanced subtree is itself red, this maneuver introduces
+another local violation higher in the tree. This violation can be handled in the
+same way by preemptively balancing the tree as the search recedes. As each
+violation is introduced, the balance operation resolves it and possibly
+introduces another closer to the root, only to be handled by a balance there. 
 
-Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express the \scheme{insert} function with
+Using a bit of syntactic sugar on top of Racket \cite{plt-tr1}, we can express
+the \scheme{insert} function with
 \begin{schemedisplay}
 (define (insert t v)
   (match t
@@ -102,18 +172,38 @@ where \scheme{balance} is defined by
        (B (R a x (R b y c)) z d)
        (B a x (R (R b y c) z d))
        (B a x (R b y (R c z d))))
-   (R (B a x b) y (B c z d))])
+   (R (B a x b) y (B c z d))]
+  [t t])
 \end{schemedisplay}
 
-In order to verify that we are not beguiled by the elegance of \scheme{balance}, we need to ensure that the transformation it performs has three properties, that as it resolves one violation: it preserves correct tree ordering; it does not unduly introduce other local property (red-red) violations; and it does not introduce any global property (height) violations.
+In order to verify that we are not beguiled by the elegance of \scheme{balance},
+we need to ensure that the transformation it performs has three properties, that
+as it resolves one violation: it preserves correct tree ordering; it does not
+unduly introduce other local property (red-red) violations; and it does not
+introduce any global property (height) violations.
 
-It is routine to verify that this transformation preserves a correct tree ordering, but no less important for it. We will say little about order preservation, but it is critical to verify for each transformation we introduce.
+It is routine to verify that this transformation preserves a correct tree
+ordering, but no less important for it. We will say little about order
+preservation, but it is critical to verify for each transformation we introduce.
 
-Next, we verify that this transformation doesn't introduce any red-red violations unduly. It clearly resolves the red-red violation of its design, and we have accounted for the red-red violation possibly introduced by it higher in the tree, but we still must consider any possible introductions below. This is as simple as observing that, below this section of the tree, the subtrees $a$, $b$, $c$, and $d$ are compatible with their newly-assigned parents, no matter the colorings of their roots.
+Next, we verify that this transformation doesn't introduce any red-red
+violations unduly. It clearly resolves the red-red violation of its design, and
+we have accounted for the red-red violation possibly introduced by it higher in
+the tree, but we still must consider any possible introductions below. This is
+as simple as observing that, below this section of the tree, the subtrees $a$,
+$b$, $c$, and $d$ are compatible with their newly-assigned parents, no matter
+the colorings of their roots.
 
-Finally, we verify that the transformation does not introduce any height violations. We do this by ensuring that the number of black nodes this section of the tree contributes to each path through it is the same before and after it occurs. Like the first property, verifying this is routine but nevertheless critical.
+Finally, we verify that the transformation does not introduce any height
+violations. We do this by ensuring that the number of black nodes this section
+of the tree contributes to each path through it is the same before and after it
+occurs. Like the first property, verifying this is routine but nevertheless
+critical.
 
-The final stop of Okasaki's insertion algorithm is to blacken the root of the tree, which may resolve a red-red violation outside the scope of \scheme{balance} and is benign otherwise. This requires a small modification of \scheme{insert} to 
+The final stop of Okasaki's insertion algorithm is to blacken the root of the
+tree, which may resolve a red-red violation outside the scope of
+\scheme{balance} and is benign otherwise. This requires a small modification of
+\scheme{insert} to 
 \begin{schemedisplay}
 (define (insert t v)
   (define (ins t v)
@@ -132,7 +222,10 @@ with \scheme{blacken} given by
 (define-match blacken
   [(N _ a x b) (N 'B a x b)])
 \end{schemedisplay}
-Our formulation of the red-black invariants allows trees to have red roots in some cases, so our root-coloring policy is more conservative, only blackening if the red-black construction demands it. This leads only to a change to \scheme{blacken}, which is now
+Our formulation of the red-black invariants allows trees to have red roots in
+some cases, so our root-coloring policy is more conservative, only blackening if
+the red-black construction demands it. This leads only to a change to
+\scheme{blacken}, which is now
 \begin{schemedisplay}
 (define-match blacken
   [(or (R (R? a) x b)
@@ -143,25 +236,41 @@ Our formulation of the red-black invariants allows trees to have red roots in so
 
 \section{Deletion}
 
-Insertion into binary trees has the advantage that new nodes are added only to the fringe, whereas deletion might also target interior nodes. With deletion, we only have to be slightly clever to reduce the latter situation to the former: when deleting a value that resides in an interior node, replace that node's value with the minimum value of its right subtree, and delete that value from that subtree.\footnote{An alternative is to distinguish left subtrees and use the maximum element. By considering right subtrees, we get a \scheme|min-element| function for free, which is useful for priority queues.} This strategy contains a reference to deletion itself, so, like insertion, this approach can be defined recursively. Roughly, we express it by
+Insertion into binary trees has the advantage that new nodes are added only to
+the fringe, whereas deletion might also target interior nodes. With deletion, we
+only have to be slightly clever to reduce the latter situation to the former:
+when deleting a value that resides in an interior node, replace that node's
+value with the minimum value of its right subtree, and delete that value from
+that subtree.\footnote{An alternative is to distinguish left subtrees and use
+the maximum element. By considering right subtrees, we get a
+\scheme|min-element| function for free, which is useful for priority queues.}
+This strategy contains a reference to deletion itself, so, like insertion, this
+approach can be defined recursively. Roughly, we express it by
 \begin{schemedisplay}
 (define (delete t v)
   (match t
     [(N c a x b)
      (switch-compare
-       (k x)
+       (v x)
        [< (N c (delete a v) x b)]
        [= (let ([v (min-element b)])
             (N c a v (delete b v)))]
        [> (N c a x (delete b v))])]))
 \end{schemedisplay}
-Essentially, this algorithm first locates the given value with a simple binary search and then applies our strategy, invoking itself. By enhancing this approach to account for red-black properties, we obtain a sound, persistent method of deletion from red-black trees!
+Essentially, this algorithm first locates the given value with a simple binary
+search and then applies our strategy, invoking itself. By enhancing this
+approach to account for red-black properties, we obtain a sound, persistent
+method of deletion from red-black trees.
 
-We start by considering the genuine base cases of the delete algorithm, the configurations that don't entail a node with a right subtree from which we can extract the minimum element.
+We start by considering the genuine base cases of the delete algorithm, the
+configurations that don't entail a node with a right subtree from which we can
+extract the minimum element.
 
 \begin{itemize}
 
-\item If the value to delete is not present in the tree, the search will terminate on an empty tree. This presents no difficulty: the empty tree remains unchanged after the removal of any element.
+\item If the value to delete is not present in the tree, the search will
+terminate on an empty tree. This presents no difficulty: the empty tree remains
+unchanged after the removal of any element.
 \begin{center}
 \includegraphics{empty-step.pdf}
 \end{center}
@@ -170,7 +279,9 @@ As a case for the \scheme{delete} function, this can be written
 [(L) (L)]
 \end{schemedisplay}
 
-\item Because red nodes do not contribute to the height of the tree, we can soundly remove them from the bottom. Therefore, a single red node becomes the empty tree.
+\item Because red nodes do not contribute to the height of the tree, we can
+soundly remove them from the bottom. Therefore, a single red node becomes the
+empty tree.
 \begin{center}
 \includegraphics{single-red-step.pdf}
 \end{center}
@@ -185,11 +296,14 @@ As a case for the \scheme{delete} function, this is
 \end{center}
 violates the global property and cannot occur.
 
-\item A black node with a red-rooted left subtree becomes the subtree itself, only black-rooted.
+\item A black node with a red-rooted left subtree becomes the subtree itself,
+only black-rooted.
 \begin{center}
 \includegraphics{black-red-left-subtree-step.pdf}
 \end{center}
-Conceptually, we are only removing a single red node from the tree, which--absent subtree merging--is completely straightforward. As a case for the \scheme{delete} function, this is
+Conceptually, we are only removing a single red node from the tree,
+which--absent subtree merging--is completely straightforward. As a case for the
+\scheme{delete} function, this is
 \begin{schemedisplay}
 [(B (R a x b) (== v) (L)) (B a x b)]
 \end{schemedisplay}
@@ -198,7 +312,13 @@ Conceptually, we are only removing a single red node from the tree, which--absen
 \begin{center}
 \includegraphics{single-black.pdf}
 \end{center}
-presents us with a challenge. The paths that end at one of its leaves accumulate two black nodes from this portion of the tree--one from the node itself and one from the leaf. Thus, the careless excision of the node would violate the global property by altering the height of the tree. Repurposing some wisdom from Okasaki, perhaps we should attempt to preserve the global property at the expense of something more local. We do this by introducing the double-black color (\scheme{BB}) of which both nodes
+presents us with a challenge. The paths that end at one of its leaves accumulate
+two black nodes from this portion of the tree--one from the node itself and one
+from the leaf. Thus, the careless excision of the node would violate the global
+property by altering the height of the tree. Repurposing some wisdom from
+Okasaki, perhaps we should attempt to preserve the global property at the
+expense of something more local. We do this by introducing the double-black
+color (\scheme{BB}) of which both nodes
 \begin{center}
 \includegraphics{double-black-tree.pdf}
 \end{center}
@@ -206,18 +326,30 @@ and leaves
 \begin{center}
 \includegraphics{double-black-leaf.pdf}
 \end{center}
-can be classified. When counting, a double-black node contributes two black nodes to any path that travels through it. With this intuition, it is obvious what a lone black node becomes after deletion:
+can be classified. When counting, a double-black node contributes two black
+nodes to any path that travels through it. With this intuition, it is obvious
+what a lone black node becomes after deletion:
 \begin{center}
 \includegraphics{single-black-step.pdf}
 \end{center}
 
 \end{itemize}
 
-Of course, once this substitution is made, we no longer have a red-black tree, and must reconcile our newly-created tree with the red-black properties. Having adopted Okasaki's initial approach, it seems only natural to apply the rest of it, if possible.
+Of course, once this substitution is made, we no longer have a red-black tree,
+and must reconcile our newly-created tree with the red-black properties. Having
+adopted Okasaki's initial approach, it seems only natural to apply the rest of
+it, if possible.
 
-Recall that \scheme{insert} adds a red node to the tree, possibly introducing a red-red violation, and that \scheme{balance} resolves a red-red violation locally, possibly introducing another higher in the tree. Because \scheme{insert} is recursive, it can apply \scheme{balance} at each level, pushing red-red violations to the root where they can be resolved unequivocally.
+Recall that \scheme{insert} adds a red node to the tree, possibly introducing a
+red-red violation, and that \scheme{balance} resolves a red-red violation
+locally, possibly introducing another higher in the tree. Because
+\scheme{insert} is recursive, it can apply \scheme{balance} at each level,
+pushing red-red violations to the root where they can be resolved unequivocally.
 
-We now find wisdom in formulating \scheme{delete} recursively, as we can use the same strategy. Instead of introducing red-red violations to be resolved by \scheme{balance}, we introduce double-black nodes to be discharged by \scheme{rotate}.
+We now find wisdom in formulating \scheme{delete} recursively, as we can use the
+same strategy. Instead of introducing red-red violations to be resolved by
+\scheme{balance}, we introduce double-black nodes to be discharged by
+\scheme{rotate}.
 
 Our \scheme{delete} function is now defined as
 \begin{schemedisplay}
@@ -237,22 +369,41 @@ Our \scheme{delete} function is now defined as
 \end{schemedisplay}
 with \scheme{rotate} not yet defined.
 
-The \scheme{rotate} function rearranges trees whose root node has a double-black child and either discharges the double-black node immediately or moves it to the root of the tree. Surprisingly, it need only be applied to three distinct cases and their reflections.
+The \scheme{rotate} function rearranges trees whose root node has a double-black
+child and either discharges the double-black node immediately or moves it to the
+root of the tree. Surprisingly, it need only be applied to three distinct cases
+and their reflections.
 
-The first case is a red-rooted tree with a double-black child. This condition is sufficient to conclude that the other child is black--not red--and is a node--not a leaf. In this case, the double-black node can be discharged immediately with the rotation
+The first case is a red-rooted tree with a double-black child. This condition is
+sufficient to conclude that the other child is black--not red--and is a
+node--not a leaf. In this case, the double-black node can be discharged
+immediately with the rotation
 \begin{center}
 \includegraphics{BB-R-B.pdf}
 \end{center}
-We can verify that the number of black nodes this tree contributes to each path through it is unchanged by this rotation, so it doesn't disrupt the global property. However, it possibly introduces a red-red violation. Fortunately, this is no matter: we can \scheme{balance} it away! If we do so, we don't need to worry about introducing another red-red violation--akin to \scheme{insert}--since the root of this section of the tree was red originally. As a case for the \scheme{rotate} function, we can express the rotation of this case and its reflection by
+We can verify that the number of black nodes this tree contributes to each path
+through it is unchanged by this rotation, so it doesn't disrupt the global
+property. However, it possibly introduces a red-red violation. Fortunately, this
+is no matter: we can \scheme{balance} it away. If we do so, we don't need to
+worry about introducing another red-red violation--akin to
+\scheme{insert}--since the root of this section of the tree was red originally.
+As a case for the \scheme{rotate} function, we can express the rotation of this
+case and its reflection by
 \begin{schemedisplay}
 [(R (BB? a-x-b) y (B c z d))
  (balance (B (R (-B a-x-b) y c) z d))]
 [(R (B a x b) y (BB? c-z-d))
  (balance (B a x (R b y (-B c-z-d))))]
 \end{schemedisplay}
-where \scheme{BB?} matches a double-black node or leaf without deconstructing it and \scheme{-B} demotes a double-black node or leaf to its black counterpart (and is undefined on red nodes).
+where \scheme{BB?} matches a double-black node or leaf without deconstructing it
+and \scheme{-B} demotes a double-black node or leaf to its black counterpart
+(and is undefined on red nodes).
 
-The second case is a black-rooted tree with a double-black child and a black child, necessarily a node. The situation is identical to the previous case but for the additional black node contributed by the root to each path. This additional black node prevents us from discharging the double-black node immediately so we defer its resolution by arranging it at the root.
+The second case is a black-rooted tree with a double-black child and a black
+child, necessarily a node. The situation is identical to the previous case but
+for the additional black node contributed by the root to each path. This
+additional black node prevents us from discharging the double-black node
+immediately so we defer its resolution by arranging it at the root.
 \begin{center}
 \includegraphics{BB-B-B.pdf}
 \end{center}
@@ -263,7 +414,10 @@ As cases for the \scheme{rotate} function, this is
 [(B (B a x b) y (BB? c-z-d))
  (balance (BB a x (R b y (-B c-z-d))))]
 \end{schemedisplay}
-This rotation presents a minor complication: because of its double-black root, the red-red violation can no longer be handled by \scheme{balance}. We cope with this by extending \scheme{balance} over just these situations. This is as simple as adding cases for trees of the form
+This rotation presents a minor complication: because of its double-black root,
+the red-red violation can no longer be handled by \scheme{balance}. We cope with
+this by extending \scheme{balance} over just these situations. This is as simple
+as adding cases for trees of the form
 \begin{center}
 \includegraphics{two-cases-extended.pdf}
 \end{center}
@@ -271,7 +425,10 @@ and transforming them to
 \begin{center}
 \includegraphics{two-cases-extended-resolved.pdf}
 \end{center}
-Unlike the original cases of \scheme{balance}, there is no way that this transformation can introduce a red-red violation: it doesn't introduce any red nodes! In fact, the need to balance is almost preferable here since the operation itself would discharge the double-black node!
+Unlike the original cases of \scheme{balance}, there is no way that this
+transformation can introduce a red-red violation: it doesn't introduce any red
+nodes. In fact, the need to balance is almost preferable here since the
+operation itself would discharge the double-black node.
 
 \begin{figure*}
 \centering
@@ -358,15 +515,25 @@ Unlike the original cases of \scheme{balance}, there is no way that this transfo
 \label{fig:implementation}
 \end{figure*}
 
-The third and final case is a black-rooted tree with a double-black child and a red child, necessarily a node.
+The third and final case is a black-rooted tree with a double-black child and a
+red child, necessarily a node.
 \begin{center}
 \includegraphics{BB-B-R.pdf}
 \end{center}
-It is hopeless to attempt to rearrange this tree to satisfy, simultaneously, ordering, red-red violations modulo \scheme{balance}, and height adjustments modulo \scheme{rotate}. Notice, however, that there is only one possibility for the children of the red node: they are both black and both necessarily nodes. Including the inner child in our consideration gives us just enough to satisfy all the constraints:
+It is hopeless to attempt to rearrange this tree to satisfy, simultaneously,
+ordering, red-red violations modulo \scheme{balance}, and height adjustments
+modulo \scheme{rotate}. Notice, however, that there is only one possibility for
+the children of the red node: they are both black and both necessarily nodes.
+Including the inner child in our consideration gives us just enough to satisfy
+all the constraints:
 \begin{center}
 \includegraphics{BB-B-R-B.pdf}
 \end{center}
-Once again, the introduction of a red-red violation is a possibility, only this time, it is deeper in the tree. We balance where it could occur, noting that a balance could not introduce another red-red violation here, so no provisions are necessary for it. As cases for the \scheme{rotate} function, this is expressed by
+Once again, the introduction of a red-red violation is a possibility, only this
+time, it is deeper in the tree. We balance where it could occur, noting that a
+balance could not introduce another red-red violation here, so no provisions are
+necessary for it. As cases for the \scheme{rotate} function, this is expressed
+by
 \begin{schemedisplay}
 [(B (BB? a-w-b) x (R (B c y d) z e))
  (B (balance (B (R (-B a-w-b) x c) y d)) z e)]
@@ -374,15 +541,36 @@ Once again, the introduction of a red-red violation is a possibility, only this 
  (B a w (balance (B b x (R c y (-B d-z-e)))))]
 \end{schemedisplay}
 
-We might ask whether a double-black node will reach the root before resolution. Such an occurrence would not be fatal since we could soundly demote it to a black node at the root. This would require exposing the \scheme{blacken} function to the transient double-black color, but, in the interest of double-black containment, we opt for a different approach. Recall that the final step of \scheme{insert} is to to blacken the root if necessary. We apply the dual of this step so that the first step of \scheme{delete} is to redden the root if possible. This ensures that, if \scheme{rotate} applies to the root, it will be a case with a red node. Every case of \scheme{rotate} with a red node discharges the double-black node, so a node so-colored will never reach the root.
+We might ask whether a double-black node will reach the root before resolution.
+Such an occurrence would not be fatal since we could soundly demote it to a
+black node at the root. This would require exposing the \scheme{blacken}
+function to the transient double-black color, but, in the interest of
+double-black containment, we opt for a different approach. Recall that the final
+step of \scheme{insert} is to to blacken the root if necessary. We apply the
+dual of this step so that the first step of \scheme{delete} is to redden the
+root if possible. This ensures that, if \scheme{rotate} applies to the root, it
+will be a case with a red node. Every case of \scheme{rotate} with a red node
+discharges the double-black node, so a node so-colored will never reach the
+root.
 
-With proper syntax in hand, the essence of this algorithm, seen in figure \ref{fig:implementation}, is incredibly succinct.
+With proper syntax in hand, the essence of this algorithm, seen in figure
+\ref{fig:implementation}, is incredibly succinct.
 
 \section{Efficiency}
 
-Once we have established the correctness of our approach, we should consider its efficiency. We can readily see that this approach can attain logarithmic time complexity, the best for which we can hope asymptotically. However, various aspects of our implementation contribute constant penalties.
+Once we have established the correctness of our approach, we should consider its
+efficiency. We can readily see that this approach can attain logarithmic time
+complexity, the best for which we can hope asymptotically. However, various
+aspects of our implementation contribute constant penalties.
 
-To identify a particularly egregious aspect, consider what happens when the value to delete is located in an interior node. First, the left edge of its right child is traversed to obtain a replacement value. That value is then deleted from the right child, causing another traversal. This is costliest when the value to delete is found in the root node; in this case, the depth of the entire tree is traversed twice. We can remove this extraneous traversal with \scheme{min-del} which returns the minimum value and deletes it in only one traversal.
+To identify a particularly egregious aspect, consider what happens when the
+value to delete is located in an interior node. First, the left edge of its
+right child is traversed to obtain a replacement value. That value is then
+deleted from the right child, causing another traversal. This is costliest when
+the value to delete is found in the root node; in this case, the depth of the
+entire tree is traversed twice. We can remove this extraneous traversal with
+\scheme{min-del} which returns the minimum value and deletes it in only one
+traversal.
 \begin{schemedisplay}
 (define-match min-del
   [(L) (error 'min-del "empty tree")]
@@ -397,21 +585,29 @@ We also replace one clause in the \scheme{delete} function to use this.
 [= (let-values ([(v b) (min-del b)])
      (rotate (N c a v b)))]
 \end{schemedisplay}
-In addition, this function is especially useful for priority queues, and needs only a small wrapper to be usable.
+In addition, this function is especially useful for priority queues, and needs
+only a small wrapper to be usable.
 \begin{schemedisplay}
   (define (min/delete t)
     (min-del (redden t)))
 \end{schemedisplay}
 
-The next aspect we consider is our criteria for a case to be considered ``base''. We have, seemingly for the sake of simplicity, omitted
+The next aspect we consider is our criteria for a case to be considered
+``base''. We have, seemingly for the sake of simplicity, omitted
 \begin{center}
 \includegraphics{black-red-right-subtree-unbounded.pdf}
 \end{center}
-as a base case of the \scheme{delete} function, instead letting this case be handled by the recursive step. When dealing with unrestricted binary trees, this omission alters the time complexity of the algorithm. For, consider the number of invocations of \scheme{delete} on
+as a base case of the \scheme{delete} function, instead letting this case be
+handled by the recursive step. When dealing with unrestricted binary trees, this
+omission alters the time complexity of the algorithm. For, consider the number
+of invocations of \scheme{delete} on
 \begin{center}
 \includegraphics{right-cascade.pdf}
 \end{center}
-with and without a similar uncolored base case. Fortunately, the restrictions of red-black trees impose a tight bound on the maximum recursion depth of \scheme{delete}. Specifically, the global property ensures that this case is at worst
+with and without a similar uncolored base case. Fortunately, the restrictions of
+red-black trees impose a tight bound on the maximum recursion depth of
+\scheme{delete}. Specifically, the global property ensures that this case is at
+worst
 \begin{center}
 \includegraphics{black-red-right-subtree-bounded.pdf}
 \end{center}
@@ -419,35 +615,58 @@ and that
 \begin{center}
 \includegraphics{red-black-right-subtree.pdf}
 \end{center}
-cannot occur. This restriction limits the the opportunities for recursion to appear at most twice. The first appears when the candidate value resides in an interior node, and the deletion recurs on the right subtree. The second appears when the minimum element in that subtree resides in a node with a right subtree, and the deletion recurs on that subtree. The global property ensures that this subtree is a singleton, so the recursion is cut off at this point. Nevertheless, if we include a case for it, we avoid the second recursive step.
+cannot occur. This restriction limits the the opportunities for recursion to
+appear at most twice. The first appears when the candidate value resides in an
+interior node, and the deletion recurs on the right subtree. The second appears
+when the minimum element in that subtree resides in a node with a right subtree,
+and the deletion recurs on that subtree. The global property ensures that this
+subtree is a singleton, so the recursion is cut off at this point. Nevertheless,
+if we include a case for it, we avoid the second recursive step.
 
-Finally, we consider the pattern-matching aspect of our algorithm. Okasaki suggests that specializing \scheme{balance} speeds up insertion by avoiding matching against patterns that it is known will fail. Implementation brevity aside, there is little reason \emph{not} to take this advice since we can dismiss half of the \scheme{balance} cases before it is even invoked. We can do something similar for \scheme{rotate}. If, in the course of locating a node, the search recurs on the left child, then a double-black node can appear only in its place, and we can invoke a \scheme{rotate} specialized to only those cases.
+Finally, we consider the pattern-matching aspect of our algorithm. Okasaki
+suggests that specializing \scheme{balance} speeds up insertion by avoiding
+matching against patterns that it is known will fail. Implementation brevity
+aside, there is little reason \emph{not} to take this advice since we can
+dismiss half of the \scheme{balance} cases before it is even invoked. We can do
+something similar for \scheme{rotate}. If, in the course of locating a node, the
+search recurs on the left child, then a double-black node can appear only in its
+place, and we can invoke a \scheme{rotate} specialized to only those cases.
 
-Each of these aspects can be considered singly, if desired, but more important is that each presents itself naturally when the implementation concerns are organized by a good intuition.
+Each of these aspects can be considered singly, if desired, but more important
+is that each presents itself naturally when the implementation concerns are
+organized by a good intuition.
 
 \section{Conclusion}
 
-Okasaki's contribution was twofold: he provided an intuitive method of red-black tree insertion and provided a reference implementation in Haskell \cite{hudak1992report}. His language choice had the added benefit of expressing the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for \emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent syntax, and quite liberally, to keep the presentation as clear as possible. By using Racket, however, we can not only invent syntax, but also extend the language with it. This keeps our presentation clear and instructive while making it executable, which allows us to avoid straddling the border to pseudocode.
+Okasaki's contribution was twofold: he provided an intuitive method of red-black
+tree insertion and provided a reference implementation in Haskell
+\cite{hudak1992report}. His language choice had the added benefit of expressing
+the algorithm clearly and precisely. Nevertheless, Okasaki invents a syntax for
+\emph{or}-patterns in Haskell to better express \scheme{balance}. We also invent
+syntax, and quite liberally, to keep the presentation as clear as possible. By
+using Racket, however, we can not only invent syntax, but also extend the
+language with it. This keeps our presentation clear and instructive while making
+it executable, which allows us to avoid straddling the border to pseudocode.
 
 %\acks
-
+%
 %Acknowledgments, if needed.
-
+%
 % We recommend abbrvnat bibliography style.
-
+% 
 \bibliographystyle{abbrvnat}
 \bibliography{red-black-pearl}
 
 % The bibliography should be embedded for final submission.
-
+% 
 %\begin{thebibliography}{}
 %\softraggedright
-
+%
 %\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
 %P. Q. Smith, and X. Y. Jones. ...reference text...
-
+%
 %\end{thebibliography}
-
+%
 \end{document}
 
 
