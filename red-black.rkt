@@ -626,9 +626,7 @@
        (* 3/8 unit)]
       [(label _)
        (* 3/8 unit)]
-      [(or (B  _ _ _)
-           (R  _ _ _)
-           (BB _ _ _))
+      [(N _ _ _ _)
        (if (longer)
            (* 7/8 unit)
            (* 5/8 unit))]))
@@ -639,9 +637,7 @@
        (* 3/4 unit)]
       [(label _)
        (* 3/4 unit)]
-      [(or (B  _ _ _)
-           (R  _ _ _)
-           (BB _ _ _))
+      [(N _ _ _ _)
        (if (longer)
            (* 7/4 unit)
            (* 5/4 unit))]))
@@ -660,12 +656,14 @@
       (match-lambda
         ['B  "black"]
         ['R  "red"]
-        ['BB "white"]))
+        ['BB "white"]
+        [#f  "white"]))
     (define text-color
       (match-lambda
         ['B  "white"]
         ['R  "white"]
-        ['BB "black"]))
+        ['BB "black"]
+        [#f  "black"]))
     (define (render-node n ctx)
       (let ([c (N-color n)]
             [v (N-value n)])
@@ -674,7 +672,7 @@
               [text (format "~a" (match v
                                    [(cons _ v) v]
                                    [_ v]))])
-          (send ctx set-pen outline-color outline-width 'solid)
+          (send ctx set-pen outline-color outline-width (if c 'solid 'transparent))
           (send ctx set-brush fill-color 'solid)
           (send ctx draw-ellipse (- (/ node-width 2)) (- (/ node-height 2)) node-width node-height)
           (let-values ([(width height descender-height extra) (send ctx get-text-extent text)])
@@ -700,14 +698,11 @@
          (render-leaf t ctx)]
         [(label l)
          (render-label l ctx)]
-        [(or (B  a x b)
-             (R  a x b)
-             (BB a x b))
+        [(N _ a x b)
          (parameterize ([longer (match x
                                   [(cons _ _) #t]
                                   [_          #f])])
            (when a
-             
              (let ([dx (dx a)]
                    [dy (dy a)])
                (send ctx set-pen outline-color outline-width 'solid)
@@ -740,9 +735,7 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(or (B  a _ _)
-           (R  a _ _)
-           (BB a _ _))
+      [(N _ a _ _)
        (max (/ node-width 2)
             (or (and a (+ (width-tree-left a) (dx a))) 0))]
       [t (displayln t)]))
@@ -753,9 +746,7 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(or (B  _ _ b)
-           (R  _ _ b)
-           (BB _ _ b))
+      [(N _  _ _ b)
        (max (/ node-width 2)
             (or (and b (+ (dx b) (width-tree-right b))) 0))]))
   
@@ -769,9 +760,7 @@
        (/ leaf-height 2)]
       [(label _)
        (/ leaf-height 2)]
-      [(or (B  _ _ _)
-           (R  _ _ _)
-           (BB _ _ _))
+      [(N _ _ _ _)
        (/ node-height 2)]))
   
   (define height-tree-bottom
@@ -780,9 +769,7 @@
        (/ leaf-height 2)]
       [(label _)
        (/ leaf-height 2)]
-      [(or (B  a _ b)
-           (R  a _ b)
-           (BB a _ b))
+      [(N _ a _ b)
        (max (or (and a (+ (dy a) (height-tree-bottom a))) 0)
             (/ node-height 2)
             (or (and b (+ (dy b) (height-tree-bottom b))) 0))]))
@@ -795,13 +782,13 @@
   (define down-> (down-arrow 12 6 12 6))
   
   #;(render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
-                              (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
-                              (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
-                              (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
-          "four-cases")
+                                (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                                (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
+                                (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
+            "four-cases")
   
   #;(render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
-          "four-cases-resolved")
+            "four-cases-resolved")
   
   (render (vc-append 16 (list (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
                                                   (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
@@ -878,4 +865,36 @@
           "two-cases-extended-resolved")
   
   (render (tree (BB (L) "v" (BB (L) "x" (BB (L) "y" "..."))))
-          "right-cascade"))
+          "right-cascade")
+  
+  (render (tree (N #f (R (BB "a" "x" "b") "y" (B "c" "z" "d")) "..." #f))
+          "test-tree")
+  
+  (define (random-tree h)
+    (define (random-tree-inner h [red-ok? #t])
+      (if (and red-ok? (zero? (random 2)))
+          (N 'R
+             (random-tree-inner h #f)
+             #f
+             (random-tree-inner h #f))
+          (if (= h 1)
+              (L)
+              (N 'B
+                 (random-tree-inner (sub1 h) #t)
+                 #f
+                 (random-tree-inner (sub1 h) #t)))))    
+    (define (number-tree t [n 1])
+    (match t
+      [(L)
+       (values t n)]
+      [(N c l _ r)
+       (let*-values ([(l n) (number-tree l n)]
+                     [(v) n]
+                     [(r n) (number-tree r (add1 n))])
+         (values (N c l v r) n))])) 
+    (let-values ([(t n) (number-tree (random-tree-inner h))])
+      t))
+  
+  #;(for ([i 100])
+    (render (tree (random-tree (add1 (floor (/ (log (add1 i)) (log 2))))))
+            (number->string i))))
