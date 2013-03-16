@@ -8,15 +8,36 @@
          min
          delete)
 
-(struct RB-tree () #:transparent)
-(struct L RB-tree () #:transparent)
+(struct RB-tree (data) #:transparent)
+(struct L-tree RB-tree () #:transparent)
 (struct L2 RB-tree () #:transparent)
-(struct N RB-tree (color left-child value right-child) #:transparent)
+(struct N-tree RB-tree (color left-child value right-child) #:transparent)
+
+(define N-data RB-tree-data)
+(define N-color N-tree-color)
+(define N-value N-tree-value)
+(define L? L-tree?)
 
 (define-syntax-rule (define-match id cases ...)
   (define id
     (match-lambda
       cases ...)))
+
+(define-match-expander N
+  (syntax-rules ()
+    [(_ c a x b) (N-tree _ c a x b)]
+    [(_ d c a x b) (N-tree d c a x b)])
+  (syntax-rules ()
+    [(_ c a x b)   (N-tree #f c a x b)]
+    [(_ d c a x b) (N-tree d c a x b)]))
+
+(define-match-expander L
+  (syntax-rules ()
+    [(_) (L-tree _)]
+    [(_ d) (L-tree d)])
+  (syntax-rules ()
+    [(_) (L-tree #f)]
+    [(L d) (L-tree d)]))
 
 (define-match-expander B
   (syntax-rules ()
@@ -52,10 +73,10 @@
 
 (define-match-expander BB
   (syntax-rules ()
-    [(_)       (L2)]
+    [(_)       (L2 _)]
     [(_ a x b) (N 'BB a x b)])
   (syntax-rules ()
-    [(_) (L2)]
+    [(_) (L2 #f)]
     [(_ a x b) (N 'BB a x b)]))
 
 (define-match-expander BB?
@@ -494,7 +515,8 @@
 
 (module+ diagram
   (require racket/class
-           racket/draw)
+           racket/draw
+           racket/set)
   
   (struct renderable () #:transparent)
   (struct tree renderable (tree) #:transparent)
@@ -531,8 +553,12 @@
       [(down-arrow bl _ hl _)
        (+ bl hl)]))
   
+  
+  (define fixed-render? (make-parameter #f))
+  
   (define outline-color "black")
   (define outline-width 2)
+  
   
   (define (render r name)
     (define inset 8)
@@ -652,38 +678,45 @@
   (define node-height 32)
   
   (define (render-tree t ctx)
-    (define fill-color
-      (match-lambda
-        ['B  "black"]
-        ['R  "red"]
-        ['BB "white"]
-        [#f  "white"]))
+    (define (node-pen n)
+      (new pen%
+           [color outline-color]
+           [width outline-width]
+           [style (if (N-color n)
+                      (if (and (N-data n)
+                               (set-member? (N-data n) 'emphasize))
+                          'short-dash
+                          'solid)
+                      'transparent)]))
+    (define (node-brush n)
+      (new brush%
+           [color (match n
+                    [(B? _)  "black"]
+                    [(R? _)  "red"]
+                    [(BB? _) "white"]
+                    [(N #f _ _ _) "white"])]
+           [style 'solid]))
     (define text-color
       (match-lambda
-        ['B  "white"]
-        ['R  "white"]
-        ['BB "black"]
-        [#f  "black"]))
+        [(B? _)  "white"]
+        [(R? _)  "white"]
+        [(BB? _) "black"]
+        [(N #f _ _ _) "black"]))
     (define (render-node n ctx)
-      (let ([c (N-color n)]
-            [v (N-value n)])
-        (let ([fill-color (fill-color c)]
-              [text-color (text-color c)]
-              [text (format "~a" (match v
-                                   [(cons _ v) v]
-                                   [_ v]))])
-          (send ctx set-pen outline-color outline-width (if c 'solid 'transparent))
-          (send ctx set-brush fill-color 'solid)
-          (send ctx draw-ellipse (- (/ node-width 2)) (- (/ node-height 2)) node-width node-height)
-          (let-values ([(width height descender-height extra) (send ctx get-text-extent text)])
-            (send ctx set-text-foreground text-color)
-            (send ctx draw-text text (- (/ width 2)) (- (- (/ (- height descender-height) 2)) 2))))))
+      (let ([pen (node-pen n)]
+            [brush (node-brush n)]
+            [text-color (text-color n)]
+            [text (format "~a" (N-value n))])
+        (send ctx set-pen pen)
+        (send ctx set-brush brush)
+        (send ctx draw-ellipse (- (/ node-width 2)) (- (/ node-height 2)) node-width node-height)
+        (let-values ([(width height descender-height extra) (send ctx get-text-extent text)])
+          (send ctx set-text-foreground text-color)
+          (send ctx draw-text text (- (/ width 2)) (- (- (/ (- height descender-height) 2)) 2)))))
     (define (render-leaf l ctx)
-      (let ([fill-color (fill-color (match l
-                                      [(L)  'B]
-                                      [(BB) 'BB]))])
+      (let ([brush (node-brush l)])
         (send ctx set-pen outline-color outline-width 'solid)
-        (send ctx set-brush fill-color 'solid)
+        (send ctx set-brush brush)
         (send ctx draw-ellipse (- (/ leaf-width 2)) (- (/ leaf-height 2)) leaf-width leaf-height)))
     (define (render-label l ctx)
       (send ctx set-pen "white" 0 'transparent)
@@ -698,20 +731,23 @@
          (render-leaf t ctx)]
         [(label l)
          (render-label l ctx)]
-        [(N _ a x b)
-         (parameterize ([longer (match x
-                                  [(cons _ _) #t]
-                                  [_          #f])])
-           (when a
-             (let ([dx (dx a)]
+        [(N d _ a x b)
+         (when a
+           (parameterize ([longer (or (and d (set-member? d 'longer)) (longer))])
+             (let ([dx (if (fixed-render?)
+                           (dx a)
+                           (+ (width-tree-right a) unit/8))]
                    [dy (dy a)])
                (send ctx set-pen outline-color outline-width 'solid)
                (send ctx draw-line 0 0 (- dx) dy)
                (send ctx translate (- dx) dy)
                (render-tree-inner a ctx)
-               (send ctx translate dx (- dy))))
-           (when b
-             (let ([dx (dx b)]
+               (send ctx translate dx (- dy)))))
+         (when b
+           (parameterize ([longer (or (and d (set-member? d 'longer)) (longer))])
+             (let ([dx (if (fixed-render?)
+                           (dx b)
+                           (+ unit/8 (width-tree-left b)))]
                    [dy (dy b)])
                (send ctx set-pen outline-color outline-width 'solid)
                (send ctx draw-line 0 0 dx dy)
@@ -735,10 +771,11 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(N _ a _ _)
+      [(N _ _ a _ _)
        (max (/ node-width 2)
-            (or (and a (+ (width-tree-left a) (dx a))) 0))]
-      [t (displayln t)]))
+            (or (and a (if (fixed-render?)
+                           (+ (width-tree-left a) (dx a))
+                           (+ (width-tree a) unit/8))) 0))]))
   
   (define width-tree-right
     (match-lambda
@@ -746,9 +783,11 @@
        (/ leaf-width 2)]
       [(label _)
        (/ leaf-width 2)]
-      [(N _  _ _ b)
+      [(N _ _ _ _ b)
        (max (/ node-width 2)
-            (or (and b (+ (dx b) (width-tree-right b))) 0))]))
+            (or (and b (if (fixed-render?)
+                           (+ (dx b) (width-tree-right b))
+                           (+ (width-tree b) unit/8))) 0))]))
   
   (define (width-tree t)
     (+ (width-tree-left t)
@@ -781,98 +820,112 @@
   (define right-> (right-arrow 32 2 16 3))
   (define down-> (down-arrow 12 6 12 6))
   
-  #;(render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
-                                (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
-                                (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
-                                (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
-            "four-cases")
-  
-  #;(render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
-            "four-cases-resolved")
-  
-  (render (vc-append 16 (list (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
-                                                  (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
-                                                  (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
-                                                  (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
-                              down->
-                              (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))))
-          "balance")
-  
-  (render (tree (B (L) "x" (R "a" "y" "b")))
-          "black-red-right-subtree-unbounded")
-  
-  (render (tree (B (L) "x" (R (L) "y" (L))))
-          "black-red-right-subtree-bounded")
-  
-  (render (tree (R (L) "x" (B "a" "y" "b")))
-          "red-black-right-subtree")
-  
-  (render (hc-append 16 (list (tree (L))
-                              right->
-                              (tree (L))))
-          "empty-step")
-  
-  (render (hc-append 16 (list (tree (R (L) "v" (L)))
-                              right->
-                              (tree (L))))
-          "single-red-step")
-  
-  (render (tree (R (B "a" "x" "b") "v" (L)))
-          "red-black-left-subtree")
-  
-  (render (hc-append 16 (list (tree (B (R "a" "x" "b") "v" (L)))
-                              right->
-                              (tree (B "a" "x" "b"))))
-          "black-red-left-subtree-step")
-  
-  (render (tree (B (L) "v" (L)))
-          "single-black")
-  
-  (render (tree (BB "a" "x" "b"))
-          "double-black-tree")
-  
-  (render (tree (BB))
-          "double-black-leaf")
-  
-  (render (hc-append 16 (list (tree (B (L) "v" (L)))
-                              right->
-                              (tree (BB))))
-          "single-black-step")
-  
-  (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
-                              right->
-                              (tree (B (R (B "a" "x" "b") "y" "c") "z" "d"))))
-          "BB-R-B")
-  
-  (render (hc-append 16 (list (tree (B (BB "a" "x" "b") "y" (B "c" "z" "d")))
-                              right->
-                              (tree (BB (R (B "a" "x" "b") "y" "c") "z" "d"))))
-          "BB-B-B")
-  
-  (render (tree (B (BB "a" "x" "b") "y" (R "c" "z" "d")))
-          "BB-B-R")
-  
-  (render (hc-append 16 (list (tree (B (BB "a" "w" "b") "x" (R (B "c" "y" "d") (cons #t "z") "e")))
-                              right->
-                              (tree (B (B (R (B "a" "w" "b") "x" "c") "y" "d") "z" "e"))))
-          "BB-B-R-B")
-  
-  (render (hc-append 16 (list (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
-                              (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))))
-          "two-cases-extended")
-  
-  (render (tree (B (B "a" "x" "b") "y" (B "c" "z" "d")))
-          "two-cases-extended-resolved")
-  
-  (render (tree (BB (L) "v" (BB (L) "x" (BB (L) "y" "..."))))
-          "right-cascade")
+  (parameterize ([fixed-render? #t])
+    #;(render (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
+                                  (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                                  (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
+                                  (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
+              "four-cases")
+    
+    #;(render (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))
+              "four-cases-resolved")
+    
+    (render (vc-append 16 (list (hc-append 16 (list (tree (B (R (R "a" "x" "b") "y" "c") "z" "d"))
+                                                    (tree (B (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                                                    (tree (B "a" "x" (R (R "b" "y" "c") "z" "d")))
+                                                    (tree (B "a" "x" (R "b" "y" (R "c" "z" "d"))))))
+                                down->
+                                (tree (R (B "a" "x" "b") "y" (B "c" "z" "d")))))
+            "balance")
+    
+    (render (tree (B (L) "x" (R "a" "y" "b")))
+            "black-red-right-subtree-unbounded")
+    
+    (render (tree (B (L) "x" (R (L) "y" (L))))
+            "black-red-right-subtree-bounded")
+    
+    (render (tree (R (L) "x" (B "a" "y" "b")))
+            "red-black-right-subtree")
+    
+    (render (hc-append 16 (list (tree (L))
+                                right->
+                                (tree (L))))
+            "empty-step")
+    
+    (render (hc-append 16 (list (tree (R (L) "v" (L)))
+                                right->
+                                (tree (L))))
+            "single-red-step")
+    
+    (render (tree (R (B "a" "x" "b") "v" (L)))
+            "red-black-left-subtree")
+    
+    (render (hc-append 16 (list (tree (B (R "a" "x" "b") "v" (L)))
+                                right->
+                                (tree (B "a" "x" "b"))))
+            "black-red-left-subtree-step")
+    
+    (render (tree (B (L) "v" (L)))
+            "single-black")
+    
+    (render (tree (BB "a" "x" "b"))
+            "double-black-tree")
+    
+    (render (tree (BB))
+            "double-black-leaf")
+    
+    (render (hc-append 16 (list (tree (B (L) "v" (L)))
+                                right->
+                                (tree (BB))))
+            "single-black-step")
+    
+    (render (hc-append 16 (list (tree (R (BB "a" "x" "b") "y" (B "c" "z" "d")))
+                                right->
+                                (tree (B (R (B "a" "x" "b") "y" "c") "z" "d"))))
+            "BB-R-B")
+    
+    (render (hc-append 16 (list (tree (B (BB "a" "x" "b") "y" (B "c" "z" "d")))
+                                right->
+                                (tree (BB (R (B "a" "x" "b") "y" "c") "z" "d"))))
+            "BB-B-B")
+    
+    (render (tree (B (BB "a" "x" "b") "y" (R "c" "z" "d")))
+            "BB-B-R")
+    
+    (render (hc-append 16 (list (tree (B (BB "a" "w" "b") "x" (N (seteq 'longer) 'R (B "c" "y" "d") "z" "e")))
+                                right->
+                                (tree (B (B (R (B "a" "w" "b") "x" "c") "y" "d") "z" "e"))))
+            "BB-B-R-B")
+    
+    (render (hc-append 16 (list (tree (BB (R "a" "x" (R "b" "y" "c")) "z" "d"))
+                                (tree (BB "a" "x" (R (R "b" "y" "c") "z" "d")))))
+            "two-cases-extended")
+    
+    (render (tree (B (B "a" "x" "b") "y" (B "c" "z" "d")))
+            "two-cases-extended-resolved")
+    
+    (render (tree (BB (L) "v" (BB (L) "x" (BB (L) "y" "..."))))
+            "right-cascade"))
   
   (render (tree (N #f (R (BB "a" "x" "b") "y" (B "c" "z" "d")) "..." #f))
           "test-tree")
   
+  (define (number-tree t)
+    (define (number-tree-inner t n)
+      (match t
+        [(L)
+         (values t n)]
+        [(N c l _ r)
+         (let*-values ([(l n) (number-tree-inner l n)]
+                       [(v) n]
+                       [(r n) (number-tree-inner r (add1 n))])
+           (values (N c l v r) n))]))
+    (let-values ([(t n) (number-tree-inner t 1)])
+      t))
+  
   (define (random-tree h)
     (define (random-tree-inner h [red-ok? #t])
-      (if (and red-ok? (zero? (random 2)))
+      (if (and red-ok? (zero? (random 6)))
           (N 'R
              (random-tree-inner h #f)
              #f
@@ -883,18 +936,115 @@
                  (random-tree-inner (sub1 h) #t)
                  #f
                  (random-tree-inner (sub1 h) #t)))))    
-    (define (number-tree t [n 1])
-    (match t
-      [(L)
-       (values t n)]
-      [(N c l _ r)
-       (let*-values ([(l n) (number-tree l n)]
-                     [(v) n]
-                     [(r n) (number-tree r (add1 n))])
-         (values (N c l v r) n))])) 
-    (let-values ([(t n) (number-tree (random-tree-inner h))])
-      t))
+    (number-tree (random-tree-inner h)))
+  
+  (struct tree-context () #:transparent)
+  (struct E-context () #:transparent)
+  (struct L-context tree-context (color value sibling context) #:transparent)
+  (struct R-context tree-context (color value sibling context) #:transparent)
+  
+  (define (compose e t)
+    (match e
+      [(E-context) t]
+      [(L-context c v s e)
+       (compose e (N c t v s))]
+      [(R-context c v s e)
+       (compose e (N c s v t))]))
+  
+  (define context (make-parameter #f))  
+  
+  (define emphasize
+    (match-lambda
+      [(L d) (L (set-add (or d (seteq)) 'emphasize))]
+      [(BB) (L2 #t)]
+      [(N d c a x b) (N (set-add (or d (seteq)) 'emphasize) c a x b)]))
+  
+  (define prefix (make-parameter ""))
+  
+  
+  
+  (define (delete t v cmp)
+    (define counter 0)
+    (define (step t)
+      (render (tree (compose (context) (emphasize t)))
+              (format "~a-~a" (prefix) counter))
+      (set! counter (add1 counter))
+      t)
+    (define redden
+      (match-lambda
+        [(B (B? a) x (B? b))
+         (step (R a x b))]
+        [t t]))
+    (define-match balance
+      [(or (B (R (R a x b) y c) z d)
+           (B (R a x (R b y c)) z d)
+           (B a x (R (R b y c) z d))
+           (B a x (R b y (R c z d))))
+       (step (R (B a x b) y (B c z d)))]
+      [(or (BB (R a x (R b y c)) z d)
+           (BB a x (R (R b y c) z d)))
+       (step (B (B a x b) y (B c z d)))]
+      [t t])
+    
+    (define-match rotate
+      [(R (BB? a-x-b) y (B c z d))
+       (balance (step (B (R (-B a-x-b) y c) z d)))]
+      [(R (B a x b) y (BB? c-z-d))
+       (balance (step (B a x (R b y (-B c-z-d)))))]
+      
+      [(B (BB? a-x-b) y (B c z d))
+       (balance (step (BB (R (-B a-x-b) y c) z d)))]
+      [(B (B a x b) y (BB? c-z-d))
+       (balance (step (BB a x (R b y (-B c-z-d)))))]
+      
+      [(B (BB? a-w-b) x (R (B c y d) z e))
+       (parameterize ([context (L-context 'B z e (context))])
+         (B (balance (step (B (R (-B a-w-b) x c) y d))) z e))]
+      [(B (R a w (B b x c)) y (BB? d-z-e))
+       (parameterize ([context (R-context 'B w a (context))])
+         (B a w (balance (step (B b x (R c y (-B d-z-e)))))))]
+      
+      [t t])
+    (define (del t v cmp)
+      (match t
+        [(L) (L)]
+        [(R (L) (== v) (L))
+         (step (L))]
+        [(B (L) (== v) (L))
+         (step (BB))]
+        [(B (R a x b) (== v) (L))
+         (step (B a x b))]
+        [(N c a x b)
+         (step (N c a x b))
+         (switch-compare
+          (cmp v x)
+          [< (let* ([t (parameterize ([context (L-context c x b (context))])
+                         (N c (del a v cmp) x b))])
+               (rotate (step t)))]
+          [= (let* ([v (min b)]
+                    [t (parameterize ([context (R-context c v a (context))])
+                         (N c a v (del b v cmp)))])
+               (rotate (step t)))]
+          [> (let* ([t (parameterize ([context (R-context c x a (context))])
+                         (N c a x (del b v cmp)))])
+               (rotate (step t)))])]))
+    (parameterize ([context (E-context)])
+      (del (redden (step t)) v cmp)))
+  
+  
+  (delete (number-tree (let* ([l1 (L)]
+                              [l2 (B l1 #f l1)]
+                              [l3 (B l2 #f l2)]
+                              [l4 (B l3 #f l3)])
+                         (B l4 #f (R l4 #f l4))))
+          4
+          <)
   
   #;(for ([i 100])
-    (render (tree (random-tree (add1 (floor (/ (log (add1 i)) (log 2))))))
-            (number->string i))))
+    (parameterize ([prefix (number->string i)])
+      (let* ([t (random-tree 4)])
+        (delete t (N-value t) <))))
+  
+  #;(for ([i 50])
+      (render (tree (random-tree (add1 (floor (/ (log (add1 i)) (log 2))))))
+              (number->string i))))
