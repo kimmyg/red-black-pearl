@@ -265,7 +265,7 @@
     [(B (R a x (B b y c)) z d)
      (values (B a x (lbalance (R b y c) z d)) #f)]
     [_ (error 'rrotate)]))
-  
+
 (define-signature empty^
   (empty-tree
    tree-empty?))
@@ -509,19 +509,19 @@
         [((set& : set^)) custom-set@ empty& insert& delete& member&]))
 
 (define (random-tree h [red-ok? #t] [n 0])
-    (cond
-      [(and red-ok? (zero? (random 2)))
-       (let*-values ([(a n) (random-tree h #f n)]
-                     [(v) n]
-                     [(b n) (random-tree h #f (add1 n))])
-         (values (N 'R a v b) n))]
-      [(= h 1)
-       (values (L) n)]
-      [else
-       (let*-values ([(a n) (random-tree (sub1 h) #t n)]
-                     [(v) n]
-                     [(b n) (random-tree (sub1 h) #t (add1 n))])
-         (values (N 'B a v b) n))]))
+  (cond
+    [(and red-ok? (zero? (random 2)))
+     (let*-values ([(a n) (random-tree h #f n)]
+                   [(v) n]
+                   [(b n) (random-tree h #f (add1 n))])
+       (values (N 'R a v b) n))]
+    [(= h 1)
+     (values (L) n)]
+    [else
+     (let*-values ([(a n) (random-tree (sub1 h) #t n)]
+                   [(v) n]
+                   [(b n) (random-tree (sub1 h) #t (add1 n))])
+       (values (N 'B a v b) n))]))
 
 (module+ test
   (define (test unit)
@@ -561,84 +561,152 @@
   (test ml-set@))
 
 (module+ benchmark
+  (define seed (random (expt 2 31)))
+  
   (define-syntax-rule (time body ...)
-      (begin
-        (collect-garbage)
-        (let ([start (current-milliseconds)]
-              [dummy (begin body ...)]
-              [end (current-milliseconds)])
-          (- end start))))
+    (begin
+      (collect-garbage)
+      (let ([start (current-milliseconds)]
+            [dummy (begin body ...)]
+            [end (current-milliseconds)])
+        (- end start))))
+  
+  (define-match actual-height
+    [(L) 1]
+    [(N _ a _ b)
+     (add1 (max (actual-height a)
+                (actual-height b)))])
+  
+  (define ((make-benchmark description seed height-stream iterations format-string outer-body inner-body))
+    (random-seed seed)
+    (displayln description)
+    (for ([h height-stream])
+      (let ([k (iterations h)])
+        (printf "~a trees with logical height ~a: " k h)
+        (printf "~a\n"
+                (format
+                 format-string
+                 (outer-body
+                  k
+                  (λ ()
+                    (call-with-values
+                     (λ () (random-tree h))
+                     inner-body))))))))
   
   (define (benchmark unit)
-    (define (deletion-with-replacement)
-      (printf "deletion with replacement\n")
-      (for ([h (in-range 1 7)])
-      (printf "~a trees with height ~a: " (expt 4 h) h)
-      (printf "~ams\n" (time
-                        (for ([j (expt 4 h)])
-                          (let-values ([(t n) (random-tree h)])
-                            (for ([i 20])
-                              (for ([x n])
-                                (delete t x)))))))))
-    (define (deletion-without-replacement)
-      (printf "deletion without replacement\n")
-      (for ([h (in-range 1 7)])
-      (printf "~a trees with height ~a: " (expt 4 h) h)
-      (printf "~ams\n" (time
-                        (for ([j (expt 4 h)])
-                          (let-values ([(t n) (random-tree h)])
-                            (for ([i 20])
-                              (for/fold ([t t])
-                                ([x n])
-                                (delete t x)))))))))
+    (define height-difference
+      (make-benchmark
+       "aggregate difference in actual tree height"
+       seed
+       (in-range 1 7)
+       (λ (h) 256)
+       "~a"
+       (λ (k body)
+         (for/sum ([i k])
+           (body)))
+       (λ (t n)
+         (let ([actual-height-t (actual-height t)])
+           (for/sum ([x n])
+             (- (actual-height (delete t x))
+                actual-height-t))))))
+    (define height-increase
+      (make-benchmark
+       "aggregate increase in actual tree height"
+       seed
+       (in-range 1 7)
+       (λ (h) 128)
+       "~a"
+       (λ (k body)
+         (for/sum ([i k])
+           (body)))
+       (λ (t n)
+         (let ([actual-height-t (actual-height t)])
+           (for/sum ([x n])
+             (max 0
+                  (- (actual-height (delete t x))
+                     actual-height-t)))))))
+    (define deletion-with-replacement
+      (make-benchmark
+       "deletion with replacement"
+       seed
+       (in-range 1 7)
+       (λ (h) (expt 4 h))
+       "~ams"
+       (λ (k body)
+         (time
+          (for ([i k])
+            (body))))
+       (λ (t n)
+         (for ([i 20])
+           (for ([x n])
+             (delete t x))))))
+    (define deletion-without-replacement
+      (make-benchmark
+       "deletion without replacement"
+       seed
+       (in-range 1 7)
+       (λ (h) (expt 4 h))
+       "~ams"
+       (λ (k body)
+         (time
+          (for ([i k])
+            (body))))
+       (λ (t n)
+         (for ([i 20])
+           (for/fold ([t t])
+             ([x n])
+             (delete t x))))))
     (define-values/invoke-unit unit
       (import)
       (export set^))
     (printf "benchmarking ~a\n" unit)
-    (deletion-with-replacement)
-    (deletion-without-replacement))
+    (random-seed seed)
+    (height-difference)
+    #;(height-increase)
+    #;(deletion-with-replacement)
+    #;(deletion-without-replacement))
   
   (benchmark modular-set@)
   (benchmark efficient-set@)
   (benchmark ml-set@)
   
   #;(define (benchmark name unit)
-    (define-syntax-rule (time body ...)
-      (begin
-        (collect-garbage)
-        (let ([start (current-milliseconds)]
-              [dummy (begin body ...)]
-              [end (current-milliseconds)])
-          (- end start))))
-    (define-syntax-rule (benchmark name (init-exprs ...) body)
-      (begin
-        (displayln name)
+      (define-syntax-rule (time body ...)
+        (begin
+          (collect-garbage)
+          (let ([start (current-milliseconds)]
+                [dummy (begin body ...)]
+                [end (current-milliseconds)])
+            (- end start))))
+      (define-syntax-rule (benchmark name (init-exprs ...) body)
+        (begin
+          (displayln name)
+          (for ([i (in-range 10 20)])
+            (let* (init-exprs ...)
+              (time
+               (for ([j 10])
+                 body))))))
+      (define (deletion-without-replacement)
+        (displayln "deletion without replacement")
         (for ([i (in-range 10 20)])
-          (let* (init-exprs ...)
-            (time
-             (for ([j 10])
-               body))))))
-    (define (deletion-without-replacement)
-      (displayln "deletion without replacement")
-      (for ([i (in-range 10 20)])
-        (let* ([n (expt 2 i)]
-               [xs (random-list n n)]
-               [s (for/fold ([s empty-tree])
-                    ([x xs])
-                    (insert s x))])
-          (printf "size ~a: ~ams\n"
-                  n
-                  (time
-                   (for ([i 10])
-                     (for/fold ([s s])
-                       ([x xs])
-                       (delete s x))))))))
-    
-    (printf "benchmarking ~a\n" name)
-    (define-values/invoke-unit unit
-      (import)
-      (export set^))
-    (deletion-without-replacement))
+          (let* ([n (expt 2 i)]
+                 [xs (random-list n n)]
+                 [s (for/fold ([s empty-tree])
+                      ([x xs])
+                      (insert s x))])
+            (printf "size ~a: ~ams\n"
+                    n
+                    (time
+                     (for ([i 10])
+                       (for/fold ([s s])
+                         ([x xs])
+                         (delete s x))))))))
+      
+      (printf "benchmarking ~a\n" name)
+      (define-values/invoke-unit unit
+        (import)
+        (export set^))
+      (deletion-without-replacement))
   
   #|   
           (define root-value
