@@ -139,7 +139,7 @@
      (B (B a x b) y (B c z d))]
     [t t]))
 
-(define-unit ml-balance@
+(define-unit ocaml-balance@
   (import)
   (export balance^)
   
@@ -189,7 +189,7 @@
      (B a x b)]
     [t t]))
 
-(define-unit ml-blacken@
+(define-unit ocaml-blacken@
   (import)
   (export blacken^)
   
@@ -244,7 +244,7 @@
      (B a w (rbalance (B b x (R c y (-B d-z-e)))))]
     [t t]))
 
-(define-unit ml-rotate@
+(define-unit ocaml-rotate@
   (import balance^)
   (export rotate^)
   
@@ -343,7 +343,7 @@
         [> (rrotate (N c a x (del b)))])])
     (del (redden t))))
 
-(define-unit ml-delete@
+(define-unit ocaml-delete@
   (import blacken^ empty^ rotate^)
   (export delete^)
   
@@ -401,8 +401,8 @@
              (if d
                  (lrotate t)
                  (values t d)))]
-        [= (if (tree-empty? r) ; this can't happen but it's in the implementation...
-               (values l #f)
+        [= (if (tree-empty? r)
+               (values l #f) ; just a leaf
                (let*-values ([(r* m d) (min-del r)]
                              [(t) (R l m r*)])
                  (if d
@@ -415,6 +415,103 @@
                  (values t d)))])])
     (let-values ([(t d) (del t)])
       t)))
+
+(define-unit appel-delete@
+  (import blacken^)
+  (export delete^)
+  
+  (define redden
+    (match-lambda
+      [(B a x b)
+       (R a x b)]
+      [t t]))
+  
+  (define lbal
+    (match-lambda**
+     [((R (R a x b) y c) z d)
+      (R (B a x b) y (B c z d))]
+     [((R a x (R b y c)) z d)
+      (R (B a x b) y (B c z d))]
+     [(a x b)
+      (B a x b)]))
+  
+  (define rbal
+    (match-lambda**
+     [(a x (R b y (R c z d)))
+      (R (B a x b) y (B c z d))]
+     [(a x (R (R b y c) z d))
+      (R (B a x b) y (B c z d))]
+     [(a x b)
+      (B a x b)]))
+     
+  (define lbalS
+    (match-lambda**
+     [((R a x b) k r)
+      (R (B a x b) k r)]
+     [(l k (B a x b))
+      (rbal l k (R a x b))]
+     [(l k (R (B a x b) y c))
+      (R (B l k a) x (rbal b y (redden c)))]
+     [(l k r)
+      (R l k r)]))
+  
+  (define rbalS
+    (match-lambda**
+     [(l k (R b x c))
+      (R l k (B b x c))]
+     [((B a x b) k r)
+      (lbal (R a x b) k r)]
+     [((R a x (B b y c)) k r)
+      (R (lbal (redden a) x b) y (B c k r))]
+     [(l k r)
+      (R l k r)]))
+  
+  (define append
+    (match-lambda
+      [(L) values]
+      [(and (N lc ll lx lr) l)
+       (letrec ([append-l
+                 (match-lambda
+                   [(L) l]
+                   [(and (N rc rl rx rr) r)
+                    (match* (lc rc)
+                      [('R 'R)
+                       (let ([lrl ((append lr) rl)])
+                         (match lrl
+                           [(R lr* x rl*)
+                            (R (R ll lx lr*) x (R rl* rx rr))]
+                           [_
+                            (R ll lx (R lrl rx rr))]))]
+                      [('B 'B)
+                       (let ([lrl ((append lr) rl)])
+                         (match lrl
+                           [(R lr* x rl*)
+                            (R (B ll lx lr*) x (B rl* rx rr))]
+                           [_
+                            (lbalS ll lx (B lrl rx rr))]))]
+                      [('B 'R)
+                       (R (append-l rl) rx rr)]
+                      [('R 'B)
+                       (R ll lx ((append lr) r))])])])
+         append-l)]))
+  
+  (define (delete t v)
+    (define del
+      (match-lambda
+        [(L) (L)]
+        [(N s _ a x b)
+         (switch-compare
+          (v x)
+          [< (if (B? a)
+                 (lbalS (del a) x b)
+                 (R (del a) x b))]
+          [= ((append a) b)]
+          [> (if (B? b)
+                 (rbalS a x (del b))
+                 (R a x (del b)))])]))
+    (blacken (del t))))
+
+
 
 (define-signature member^
   (member?
@@ -496,15 +593,26 @@
         [((member& : member^)) member@]
         [((set& : set^)) custom-set@ empty& insert& delete& member&]))
 
-(define-compound-unit ml-set@
+(define-compound-unit ocaml-set@
   (import)
   (export set&)
   (link [((empty& : empty^)) empty@]
-        [((balance& : balance^)) ml-balance@]
-        [((blacken& : blacken^)) ml-blacken@]
+        [((balance& : balance^)) ocaml-balance@]
+        [((blacken& : blacken^)) ocaml-blacken@]
         [((insert& : insert^)) okasaki-insert@ blacken& balance&]
-        [((rotate& : rotate^)) ml-rotate@ balance&]
-        [((delete& : delete^)) ml-delete@ blacken& empty& rotate&]
+        [((rotate& : rotate^)) ocaml-rotate@ balance&]
+        [((delete& : delete^)) ocaml-delete@ blacken& empty& rotate&]
+        [((member& : member^)) member@]
+        [((set& : set^)) custom-set@ empty& insert& delete& member&]))
+
+(define-compound-unit appel-set@
+  (import)
+  (export set&)
+  (link [((empty& : empty^)) empty@]
+        [((balance& : balance^)) balance@]
+        [((blacken& : blacken^)) traditional-blacken@]
+        [((insert& : insert^)) okasaki-insert@ blacken& balance&]
+        [((delete& : delete^)) appel-delete@ blacken&]
         [((member& : member^)) member@]
         [((set& : set^)) custom-set@ empty& insert& delete& member&]))
 
@@ -558,10 +666,13 @@
   
   (test modular-set@)
   (test efficient-set@)
-  (test ml-set@))
+  (test ocaml-set@)
+  (test appel-set@))
 
 (module+ benchmark
   (define seed (random (expt 2 31)))
+  
+  (define height-limit 9)
   
   (define-syntax-rule (time body ...)
     (begin
@@ -598,7 +709,7 @@
       (make-benchmark
        "aggregate difference in actual tree height"
        seed
-       (in-range 1 7)
+       (in-range 1 height-limit)
        (λ (h) 256)
        "~a"
        (λ (k body)
@@ -613,7 +724,7 @@
       (make-benchmark
        "aggregate increase in actual tree height"
        seed
-       (in-range 1 7)
+       (in-range 1 height-limit)
        (λ (h) 128)
        "~a"
        (λ (k body)
@@ -629,8 +740,8 @@
       (make-benchmark
        "deletion with replacement"
        seed
-       (in-range 1 7)
-       (λ (h) (expt 4 h))
+       (in-range 1 height-limit)
+       (λ (h) 256);(expt 4 h))
        "~ams"
        (λ (k body)
          (time
@@ -644,8 +755,8 @@
       (make-benchmark
        "deletion without replacement"
        seed
-       (in-range 1 7)
-       (λ (h) (expt 4 h))
+       (in-range 1 height-limit)
+       (λ (h) 256);(expt 4 h))
        "~ams"
        (λ (k body)
          (time
@@ -661,14 +772,15 @@
       (export set^))
     (printf "benchmarking ~a\n" unit)
     (random-seed seed)
-    (height-difference)
+    #;(height-difference)
     #;(height-increase)
-    #;(deletion-with-replacement)
-    #;(deletion-without-replacement))
+    (deletion-with-replacement)
+    (deletion-without-replacement))
   
-  (benchmark modular-set@)
+  ;(benchmark modular-set@)
   (benchmark efficient-set@)
-  (benchmark ml-set@)
+  (benchmark ocaml-set@)
+  (benchmark appel-set@)
   
   #;(define (benchmark name unit)
       (define-syntax-rule (time body ...)
