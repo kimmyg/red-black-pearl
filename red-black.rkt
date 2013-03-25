@@ -675,12 +675,18 @@
   (define height-limit 9)
   
   (define-syntax-rule (time body ...)
-    (begin
+    (let-values ([(result total cpu garbage)
+                  (time-apply
+                   (λ ()
+                     body ...)
+                   empty)])
+      total))
+  #;(begin
       (collect-garbage)
       (let ([start (current-milliseconds)]
             [dummy (begin body ...)]
             [end (current-milliseconds)])
-        (- end start))))
+        (- end start)))
   
   (define-match actual-height
     [(L) 1]
@@ -744,13 +750,13 @@
        (λ (h) 256);(expt 4 h))
        "~ams"
        (λ (k body)
-         (time
-          (for ([i k])
-            (body))))
+          (for/sum ([i k])
+            (body)))
        (λ (t n)
-         (for ([i 20])
+         (time
+          (for ([i 20])
            (for ([x n])
-             (delete t x))))))
+             (delete t x)))))))
     (define deletion-without-replacement
       (make-benchmark
        "deletion without replacement"
@@ -759,14 +765,29 @@
        (λ (h) 256);(expt 4 h))
        "~ams"
        (λ (k body)
-         (time
-          (for ([i k])
-            (body))))
+         (for/sum ([i k])
+            (body)))
        (λ (t n)
-         (for ([i 20])
+         (time
+          (for ([i 20])
            (for/fold ([t t])
              ([x n])
-             (delete t x))))))
+             (delete t x)))))))
+    (define root-removal
+      (make-benchmark
+       "root removal"
+       seed
+       (in-range 2 13)
+       (λ (h) 256);(expt 4 h))
+       "~ams"
+       (λ (k body)
+         (for/sum ([i k])
+           (body)))
+       (λ (t n)
+         (let ([v (N-value t)])
+           (time
+            (for ([i 4096])
+              (delete t v)))))))
     (define-values/invoke-unit unit
       (import)
       (export set^))
@@ -774,8 +795,9 @@
     (random-seed seed)
     #;(height-difference)
     #;(height-increase)
-    (deletion-with-replacement)
-    (deletion-without-replacement))
+    #;(deletion-with-replacement)
+    #;(deletion-without-replacement)
+    (root-removal))
   
   ;(benchmark modular-set@)
   (benchmark efficient-set@)
