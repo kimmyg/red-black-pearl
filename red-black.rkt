@@ -139,6 +139,34 @@
      (B (B a x b) y (B c z d))]
     [t t]))
 
+(define-unit extended-balance@
+  (import)
+  (export balance^)
+  
+  (define-match lbalance
+    [(or (B (R a x (R b y c)) z d)
+         (B (R (R a x b) y c) z d))
+     (R (B a x b) y (B c z d))]
+    [t t])
+  
+  (define-match rbalance
+    [(or (B a x (R (R b y c) z d))
+         (B a x (R b y (R c z d))))
+     (R (B a x b) y (B c z d))]
+    [t t])
+  
+  (define-match lbbalance
+    [(or (BB (R a x (R b y c)) z d)
+         (BB (R (R a x b) y c) z d))
+     (B (B a x b) y (B c z d))]
+    [t t])
+  
+  (define-match rbbalance
+    [(or (BB a x (R (R b y c) z d))
+         (BB a x (R b y (R c z d))))
+     (B (B a x b) y (B c z d))]
+    [t t]))
+
 (define-unit ocaml-balance@
   (import)
   (export balance^)
@@ -242,6 +270,28 @@
      (rbbalance (BB a x (R b y (-B c-z-d))))]
     [(B (R a w (B b x c)) y (BB? d-z-e))
      (B a w (rbalance (B b x (R c y (-B d-z-e)))))]
+    [t t]))
+
+(define-unit compact-rotate@
+  (import balance^)
+  (export rotate^)
+  
+  (define-match lrotate
+    [(R (BB? a-x-b) y (B c z d))
+     (rbalance (B (-B a-x-b) y (R c z d)))]
+    [(B (BB? a-x-b) y (B c z d))
+     (rbbalance (BB (-B a-x-b) y (R c z d)))]
+    [(B (BB? a-w-b) x (R (B c y d) z e))
+     (B (rbalance (B (-B a-w-b) x (R c y d))) z e)]
+    [t t])
+  
+  (define-match rrotate
+    [(R (B a x b) y (BB? c-z-d))
+     (lbalance (B (R a x b) y (-B c-z-d)))]
+    [(B (B a x b) y (BB? c-z-d))
+     (lbbalance (BB (R a x b) y (-B c-z-d)))]
+    [(B (R a w (B b x c)) y (BB? d-z-e))
+     (B a w (lbalance (B (R b x c) y (-B d-z-e))))]
     [t t]))
 
 (define-unit ocaml-rotate@
@@ -593,6 +643,18 @@
         [((member& : member^)) member@]
         [((set& : set^)) custom-set@ empty& insert& delete& member&]))
 
+(define-compound-unit efficient-compact-set@
+  (import)
+  (export set&)
+  (link [((empty& : empty^)) empty@]
+        [((balance& : balance^)) extended-balance@]
+        [((blacken& : blacken^)) conservative-blacken@]
+        [((insert& : insert^)) okasaki-insert@ blacken& balance&]
+        [((rotate& : rotate^)) compact-rotate@ balance&]
+        [((delete& : delete^)) efficient-delete@ rotate&]
+        [((member& : member^)) member@]
+        [((set& : set^)) custom-set@ empty& insert& delete& member&]))
+
 (define-compound-unit ocaml-set@
   (import)
   (export set&)
@@ -664,15 +726,16 @@
                    (or (global-property? t*) (error 'global-property "~a from ~a got ~a" x t t*))
                    (or (local-property? t*) (error 'local-property "~a from ~a got ~a" x t t*)))))))))
   
-  (test modular-set@)
+  ;(test modular-set@)
   (test efficient-set@)
-  (test ocaml-set@)
-  (test appel-set@))
+  (test efficient-compact-set@)
+  ;(test ocaml-set@)
+  #;(test appel-set@))
 
 (module+ benchmark
   (define seed (random (expt 2 31)))
   
-  (define height-limit 9)
+  (define height-limit 7)
   
   (define-syntax-rule (time body ...)
     (let-values ([(result total cpu garbage)
@@ -681,18 +744,19 @@
                      body ...)
                    empty)])
       total))
-  #;(begin
-      (collect-garbage)
-      (let ([start (current-milliseconds)]
-            [dummy (begin body ...)]
-            [end (current-milliseconds)])
-        (- end start)))
   
   (define-match actual-height
     [(L) 1]
     [(N _ a _ b)
      (add1 (max (actual-height a)
                 (actual-height b)))])
+  
+  (define (benchmark units benchmarks)
+    (for ([benchmark benchmarks])
+      (for ([run benchmark])
+        (for ([unit units])
+          (run unit))))) ; XXX fix this
+      
   
   (define ((make-benchmark description seed height-stream iterations format-string outer-body inner-body))
     (random-seed seed)
@@ -793,16 +857,17 @@
       (export set^))
     (printf "benchmarking ~a\n" unit)
     (random-seed seed)
-    #;(height-difference)
+    (height-difference)
     #;(height-increase)
     #;(deletion-with-replacement)
     #;(deletion-without-replacement)
-    (root-removal))
+    #;(root-removal))
   
   ;(benchmark modular-set@)
   (benchmark efficient-set@)
-  (benchmark ocaml-set@)
-  (benchmark appel-set@)
+  (benchmark efficient-compact-set@)
+  ;(benchmark ocaml-set@)
+  ;(benchmark appel-set@)
   
   #;(define (benchmark name unit)
       (define-syntax-rule (time body ...)
