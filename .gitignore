@@ -4,4 +4,6 @@
 *.blg
 *.log
 *.pdf
-
+.*.tex
+*.png
+compiled
